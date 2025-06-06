@@ -7,8 +7,9 @@
   <style>
     body { font-family: sans-serif; text-align: center; padding: 20px; }
     #reader { width: 90%; max-width: 500px; margin: auto; }
-    #result { margin-top: 20px; font-weight: bold; white-space: pre-wrap; }
+    #result { margin-top: 20px; font-weight: bold; white-space: pre-wrap; text-align: left; }
     #camera-select { margin-top: 10px; }
+    #version { margin-top: 40px; font-size: 0.9em; color: gray; }
   </style>
 </head>
 <body>
@@ -18,6 +19,7 @@
   </div>
   <div id="reader"></div>
   <div id="result">スキャン待機中...</div>
+  <div id="version">CROSTAFF Scanner v1.0.1</div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
@@ -92,20 +94,30 @@
         resultDiv.innerText += "🛑 カメラ停止中（送信処理のため）\n";
 
         const endpoint = "https://script.google.com/macros/s/AKfycbx85vMW0Rh9zTRqnLfyr4zAjZ-WWVIIB-8CBC46elZfe_cJyCbewoQfRuf0n5nWj5r1/exec";
-        const url = `${endpoint}?${decodedText}&area=${encodeURIComponent(area)}&action=${encodeURIComponent(action)}`;
+        const staffParam = decodedText;
+        const areaParam = encodeURIComponent(area);
+        const actionParam = encodeURIComponent(action);
 
-        resultDiv.innerText += `🌐 リクエスト送信: ${url}\n`;
+        const url = `${endpoint}?${staffParam}&area=${areaParam}&action=${actionParam}`;
+
+        resultDiv.innerText += `🌐 URL生成完了: ${url}\n`;
+        resultDiv.innerText += `📦 送信パラメータ確認 → staff=${staffParam}, area=${areaParam}, action=${actionParam}\n`;
 
         fetch(url)
-          .then(res => res.text())
+          .then(res => {
+            resultDiv.innerText += `🌐 サーバー応答ステータス: ${res.status} (${res.statusText})\n`;
+            return res.text();
+          })
           .then(txt => {
             resultDiv.innerText += `✅ 記録成功: ${txt}`;
             restartCameraAfterDelay();
           })
           .catch(err => {
-            resultDiv.innerText += `❌ 記録エラー: ${err}`;
+            resultDiv.innerText += `❌ fetch通信エラー: ${err}`;
             restartCameraAfterDelay();
           });
+      }).catch(stopErr => {
+        resultDiv.innerText += `❌ カメラ停止時エラー: ${stopErr}`;
       });
     }
 
