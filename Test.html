@@ -7,7 +7,7 @@
   <style>
     body { font-family: sans-serif; text-align: center; padding: 20px; }
     #reader { width: 90%; max-width: 500px; margin: auto; }
-    #result { margin-top: 20px; font-weight: bold; }
+    #result { margin-top: 20px; font-weight: bold; white-space: pre-wrap; }
     #camera-select { margin-top: 10px; }
   </style>
 </head>
@@ -23,10 +23,10 @@
     const params = new URLSearchParams(window.location.search);
     const area = params.get("area") || "未設定";
     const action = params.get("action") || "未設定";
+    const resultDiv = document.getElementById("result");
 
     const html5QrCode = new Html5Qrcode("reader");
 
-    // カメラリスト取得と表示
     Html5Qrcode.getCameras().then(devices => {
       const cameraSelect = document.getElementById("camera-select");
 
@@ -47,36 +47,46 @@
         });
       });
     }).catch(err => {
-      document.getElementById("result").innerText = `❌ カメラ取得エラー: ${err}`;
+      resultDiv.innerText = `❌ カメラ取得エラー: ${err}`;
     });
 
     function startCamera(cameraId) {
+      resultDiv.innerText = `📷 カメラ起動中（ID: ${cameraId}）`;
       html5QrCode.start(
         cameraId,
         { fps: 10, qrbox: { width: 350, height: 350 } },
-        onScanSuccess
+        onScanSuccess,
+        onScanFailure
       ).catch(err => {
-        document.getElementById("result").innerText = `❌ カメラ起動エラー: ${err}`;
+        resultDiv.innerText = `❌ カメラ起動エラー: ${err}`;
       });
     }
 
     function onScanSuccess(decodedText) {
+      resultDiv.innerText = `🔍 QRコード読み取り成功: ${decodedText}\n`;
+
       if (!decodedText.startsWith("staff=")) {
-        document.getElementById("result").innerText = "❌ 無効なQRコードです";
+        resultDiv.innerText += "❌ 無効なQRコード形式（'staff='で始まっていません）";
         return;
       }
 
       const endpoint = "https://script.google.com/macros/s/AKfycbxyVaTIhllrKSYdJcXdegrRO1jQba7DVyojUR1k6x5calVoRhYQYIlNpVMU_FyG8YjG8A/exec";
       const url = `${endpoint}?${decodedText}&area=${encodeURIComponent(area)}&action=${encodeURIComponent(action)}`;
 
+      resultDiv.innerText += `🌐 リクエスト送信: ${url}\n`;
+
       fetch(url)
         .then(res => res.text())
         .then(txt => {
-          document.getElementById("result").innerText = `✅ 記録成功: ${decodedText}`;
+          resultDiv.innerText += `✅ 記録成功: ${txt}`;
         })
         .catch(err => {
-          document.getElementById("result").innerText = `❌ 記録エラー: ${err}`;
+          resultDiv.innerText += `❌ 記録エラー: ${err}`;
         });
+    }
+
+    function onScanFailure(error) {
+      // 読み取り失敗時のログ（詳細には表示しない）
     }
   </script>
 </body>
