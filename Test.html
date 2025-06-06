@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>QRスキャン</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+  <h2>QRコードをスキャンしてください</h2>
+  <div id="reader" style="width: 300px;"></div>
+  <div id="result" style="margin-top: 10px;"></div>
+
+  <script>
+    const area = new URLSearchParams(window.location.search).get("area") || "未指定";
+    const action = new URLSearchParams(window.location.search).get("action") || "未指定";
+
+    function onScanSuccess(decodedText) {
+      const endpoint = "https://script.google.com/macros/s/AKfycbxyVaTIhllrKSYdJcXdegrRO1jQba7DVyojUR1k6x5calVoRhYQYIlNpVMU_FyG8YjG8A/exec";
+      const fullUrl = `${endpoint}?${decodedText}&area=${area}&action=${action}`;
+
+      fetch(fullUrl)
+        .then(res => res.text())
+        .then(txt => {
+          document.getElementById("result").innerText = "✅ 記録成功：" + decodedText;
+        })
+        .catch(err => {
+          document.getElementById("result").innerText = "❌ 記録エラー：" + err;
+        });
+    }
+
+    const html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start(
+      { facingMode: "environment" },  // 背面カメラ
+      { fps: 10, qrbox: 250 },
+      onScanSuccess
+    );
+  </script>
+</body>
+</html>
