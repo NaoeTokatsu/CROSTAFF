@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>QRスキャン - フルスク屏版</title>
+  <title>QRスキャン - フルスクリーン版</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     html, body {
@@ -20,7 +20,6 @@
       top: 0;
       left: 0;
       z-index: 1;
-      object-fit: cover;
     }
     #overlay-ui {
       position: absolute;
@@ -54,7 +53,7 @@
       z-index: 2;
       background-color: rgba(0,0,0,0.7);
       color: white;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
       font-size: 1.5em;
@@ -108,14 +107,23 @@
     });
 
     function startCamera(cameraId) {
-      maskDiv.style.display = "none";
       html5QrCode.start(
         cameraId,
-        { fps: 10, qrbox: 300 },
+        {
+          fps: 10,
+          qrbox: function(viewfinderWidth, viewfinderHeight) {
+            const minEdgePercentage = 0.7; // 70% of the smaller edge
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const qrboxSize = Math.floor(minEdge * minEdgePercentage);
+            return { width: qrboxSize, height: qrboxSize };
+          }
+        },
         onScanSuccess,
-        () => {}
+        (err) => {
+          statusDiv.innerText = `📄 ステータス: スキャン中...`;
+        }
       ).then(() => {
-        currentCameraId = cameraId;
+        maskDiv.style.display = "none";
         statusDiv.innerText = "📄 ステータス: カメラ起動中";
       }).catch(err => {
         statusDiv.innerText = `❌ カメラ起動エラー: ${err}`;
