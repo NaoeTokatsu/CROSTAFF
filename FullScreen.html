@@ -58,6 +58,28 @@
       justify-content: center;
       font-size: 1.5em;
     }
+    #result-banner {
+      position: absolute;
+      bottom: 20%;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      font-size: 2em;
+      font-weight: bold;
+      padding: 10px 20px;
+      border-radius: 10px;
+      color: white;
+      display: none;
+    }
+    #version {
+      position: absolute;
+      bottom: 5px;
+      right: 10px;
+      color: white;
+      font-size: 0.9em;
+      z-index: 5;
+      opacity: 0.7;
+    }
   </style>
 </head>
 <body>
@@ -68,6 +90,8 @@
     <div id="status">📄 ステータス: 待機中</div>
     <select id="camera-select"></select>
   </div>
+  <div id="result-banner"></div>
+  <div id="version">v1.0.5</div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
@@ -79,6 +103,7 @@
     const statusDiv = document.getElementById("status");
     const maskDiv = document.getElementById("scanner-mask");
     const cameraSelect = document.getElementById("camera-select");
+    const resultBanner = document.getElementById("result-banner");
 
     let html5QrCode = new Html5Qrcode("reader");
     let currentCameraId = null;
@@ -106,20 +131,32 @@
       });
     });
 
+    function showResultBanner(text, color) {
+      resultBanner.innerText = text;
+      resultBanner.style.backgroundColor = color;
+      resultBanner.style.display = "block";
+      setTimeout(() => {
+        resultBanner.style.display = "none";
+      }, 2000);
+    }
+
     function startCamera(cameraId) {
       html5QrCode.start(
         cameraId,
         {
           fps: 10,
           qrbox: function(viewfinderWidth, viewfinderHeight) {
-            const minEdgePercentage = 0.7; // 70% of the smaller edge
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            const qrboxSize = Math.floor(minEdge * minEdgePercentage);
-            return { width: qrboxSize, height: qrboxSize };
+            const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.6);
+            return {
+              width: size,
+              height: size,
+              x: (viewfinderWidth - size) / 2,
+              y: (viewfinderHeight - size) * 0.35
+            };
           }
         },
         onScanSuccess,
-        (err) => {
+        () => {
           statusDiv.innerText = `📄 ステータス: スキャン中...`;
         }
       ).then(() => {
@@ -141,6 +178,7 @@
 
       if (!decodedText.startsWith("staff=")) {
         statusDiv.innerText = "❌ 無効なQRコード形式";
+        showResultBanner("INVALID", "#c0392b");
         return;
       }
 
@@ -156,13 +194,16 @@
           const match = txt.match(/(IN|OUT)/);
           if (match) {
             statusDiv.innerText = `✅ ${match[1]} 記録完了`;
+            showResultBanner(match[1], "#27ae60");
           } else {
             statusDiv.innerText = `✅ 記録: ${txt}`;
+            showResultBanner("OK", "#2980b9");
           }
           maskDiv.style.display = "none";
         })
         .catch(err => {
           statusDiv.innerText = `❌ エラー: ${err}`;
+          showResultBanner("ERROR", "#e74c3c");
           maskDiv.style.display = "none";
         });
     }
