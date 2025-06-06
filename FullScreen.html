@@ -71,6 +71,12 @@
       color: white;
       display: none;
     }
+    #qrbox-frame {
+      border: 3px dashed rgba(255, 255, 255, 0.8);
+      position: absolute;
+      z-index: 2;
+      pointer-events: none;
+    }
     #version {
       position: absolute;
       bottom: 5px;
@@ -90,8 +96,9 @@
     <div id="status">📄 ステータス: 待機中</div>
     <select id="camera-select"></select>
   </div>
+  <div id="qrbox-frame"></div>
   <div id="result-banner"></div>
-  <div id="version">v1.0.5</div>
+  <div id="version">v1.0.6</div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
@@ -104,11 +111,14 @@
     const maskDiv = document.getElementById("scanner-mask");
     const cameraSelect = document.getElementById("camera-select");
     const resultBanner = document.getElementById("result-banner");
+    const qrboxFrame = document.getElementById("qrbox-frame");
 
     let html5QrCode = new Html5Qrcode("reader");
     let currentCameraId = null;
     let lastScannedStaff = null;
     let lastScannedTime = 0;
+
+    let lastQrbox = null;
 
     Html5Qrcode.getCameras().then(devices => {
       devices.forEach((device, index) => {
@@ -147,12 +157,17 @@
           fps: 10,
           qrbox: function(viewfinderWidth, viewfinderHeight) {
             const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.6);
-            return {
-              width: size,
-              height: size,
-              x: (viewfinderWidth - size) / 2,
-              y: (viewfinderHeight - size) * 0.35
-            };
+            const x = (viewfinderWidth - size) / 2;
+            const y = (viewfinderHeight - size) * 0.35;
+            lastQrbox = { width: size, height: size, x, y };
+
+            qrboxFrame.style.left = `${x}px`;
+            qrboxFrame.style.top = `${y}px`;
+            qrboxFrame.style.width = `${size}px`;
+            qrboxFrame.style.height = `${size}px`;
+            qrboxFrame.style.display = "block";
+
+            return lastQrbox;
           }
         },
         onScanSuccess,
@@ -161,7 +176,7 @@
         }
       ).then(() => {
         maskDiv.style.display = "none";
-        statusDiv.innerText = "📄 ステータス: カメラ起動中";
+        statusDiv.innerText = `📷 カメラID: ${cameraId} 起動中`;
       }).catch(err => {
         statusDiv.innerText = `❌ カメラ起動エラー: ${err}`;
       });
@@ -170,19 +185,19 @@
     function onScanSuccess(decodedText) {
       const now = Date.now();
       if (decodedText === lastScannedStaff && now - lastScannedTime < 3000) {
-        statusDiv.innerText = "⚠️ 連続スキャン防止中...";
+        statusDiv.innerText = `⚠️ スタッフID ${decodedText} の連続スキャン防止中...`;
         return;
       }
       lastScannedStaff = decodedText;
       lastScannedTime = now;
 
       if (!decodedText.startsWith("staff=")) {
-        statusDiv.innerText = "❌ 無効なQRコード形式";
+        statusDiv.innerText = `❌ 無効なQRコード: ${decodedText}`;
         showResultBanner("INVALID", "#c0392b");
         return;
       }
 
-      statusDiv.innerText = `📤 送信中...`;
+      statusDiv.innerText = `📤 スタッフ ${decodedText} を送信中...`;
       maskDiv.style.display = "flex";
 
       const endpoint = "https://script.google.com/macros/s/AKfycbx85vMW0Rh9zTRqnLfyr4zAjZ-WWVIIB-8CBC46elZfe_cJyCbewoQfRuf0n5nWj5r1/exec";
@@ -193,16 +208,16 @@
         .then(txt => {
           const match = txt.match(/(IN|OUT)/);
           if (match) {
-            statusDiv.innerText = `✅ ${match[1]} 記録完了`;
+            statusDiv.innerText = `✅ スタッフ ${decodedText} ${match[1]} 記録完了`;
             showResultBanner(match[1], "#27ae60");
           } else {
-            statusDiv.innerText = `✅ 記録: ${txt}`;
+            statusDiv.innerText = `✅ 記録成功: ${txt}`;
             showResultBanner("OK", "#2980b9");
           }
           maskDiv.style.display = "none";
         })
         .catch(err => {
-          statusDiv.innerText = `❌ エラー: ${err}`;
+          statusDiv.innerText = `❌ 通信エラー: ${err}`;
           showResultBanner("ERROR", "#e74c3c");
           maskDiv.style.display = "none";
         });
