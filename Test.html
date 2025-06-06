@@ -10,23 +10,28 @@
     #result { margin-top: 20px; font-weight: bold; white-space: pre-wrap; text-align: left; }
     #camera-select { margin-top: 10px; }
     #version { margin-top: 40px; font-size: 0.9em; color: gray; }
+    #location-indicator { font-size: 1.2em; margin: 10px 0; color: #444; }
   </style>
 </head>
 <body>
   <h2>QRコードをスキャンしてください</h2>
+  <div id="location-indicator">📍 担当エリア: 読み込み中...</div>
   <div>
     <select id="camera-select"></select>
   </div>
   <div id="reader"></div>
   <div id="result">スキャン待機中...</div>
-  <div id="version">CROSTAFF Scanner v1.0.1</div>
+  <div id="version">CROSTAFF Scanner v1.0.2</div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const area = params.get("area") || "未設定";
-    const action = params.get("action") || "未設定";
+    const actionParam = params.get("action");
     const resultDiv = document.getElementById("result");
     const cameraSelect = document.getElementById("camera-select");
+    const locationIndicator = document.getElementById("location-indicator");
+
+    locationIndicator.innerText = `📍 担当エリア: ${area}`;
 
     let html5QrCode = new Html5Qrcode("reader");
     let currentCameraId = null;
@@ -39,10 +44,12 @@
         cameraSelect.appendChild(option);
       });
 
-      if (devices.length > 0) {
-        currentCameraId = devices[0].id;
-        startCamera(currentCameraId);
-      }
+      // デフォルトは背面カメラっぽいもの（labelに"back"を含む）を選ぶ
+      const defaultCamera = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
+      currentCameraId = defaultCamera.id;
+      startCamera(currentCameraId);
+
+      cameraSelect.value = currentCameraId;
 
       cameraSelect.addEventListener("change", (event) => {
         const newCameraId = event.target.value;
@@ -96,12 +103,11 @@
         const endpoint = "https://script.google.com/macros/s/AKfycbx85vMW0Rh9zTRqnLfyr4zAjZ-WWVIIB-8CBC46elZfe_cJyCbewoQfRuf0n5nWj5r1/exec";
         const staffParam = decodedText;
         const areaParam = encodeURIComponent(area);
-        const actionParam = encodeURIComponent(action);
-
-        const url = `${endpoint}?${staffParam}&area=${areaParam}&action=${actionParam}`;
+        const actionFinal = actionParam ? `&action=${encodeURIComponent(actionParam)}` : "";
+        const url = `${endpoint}?${staffParam}&area=${areaParam}${actionFinal}`;
 
         resultDiv.innerText += `🌐 URL生成完了: ${url}\n`;
-        resultDiv.innerText += `📦 送信パラメータ確認 → staff=${staffParam}, area=${areaParam}, action=${actionParam}\n`;
+        resultDiv.innerText += `📦 送信パラメータ確認 → staff=${staffParam}, area=${areaParam}, action=${actionParam || "トグル"}\n`;
 
         fetch(url)
           .then(res => {
