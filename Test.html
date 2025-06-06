@@ -24,12 +24,12 @@
     const area = params.get("area") || "未設定";
     const action = params.get("action") || "未設定";
     const resultDiv = document.getElementById("result");
+    const cameraSelect = document.getElementById("camera-select");
 
-    const html5QrCode = new Html5Qrcode("reader");
+    let html5QrCode = new Html5Qrcode("reader");
+    let currentCameraId = null;
 
     Html5Qrcode.getCameras().then(devices => {
-      const cameraSelect = document.getElementById("camera-select");
-
       devices.forEach((device, index) => {
         const option = document.createElement("option");
         option.value = device.id;
@@ -38,12 +38,14 @@
       });
 
       if (devices.length > 0) {
-        startCamera(devices[0].id);
+        currentCameraId = devices[0].id;
+        startCamera(currentCameraId);
       }
 
       cameraSelect.addEventListener("change", (event) => {
+        const newCameraId = event.target.value;
         html5QrCode.stop().then(() => {
-          startCamera(event.target.value);
+          startCamera(newCameraId);
         });
       });
     }).catch(err => {
@@ -51,6 +53,7 @@
     });
 
     function startCamera(cameraId) {
+      currentCameraId = cameraId;
       resultDiv.innerText = `📷 カメラ起動中（ID: ${cameraId}）`;
       html5QrCode.start(
         cameraId,
@@ -62,6 +65,21 @@
       });
     }
 
+    function restartCameraAfterDelay(delayMs = 3000) {
+      setTimeout(() => {
+        html5QrCode.start(
+          currentCameraId,
+          { fps: 10, qrbox: { width: 350, height: 350 } },
+          onScanSuccess,
+          onScanFailure
+        ).then(() => {
+          resultDiv.innerText += "\n📷 カメラ再起動完了";
+        }).catch(err => {
+          resultDiv.innerText += `\n❌ カメラ再起動エラー: ${err}`;
+        });
+      }, delayMs);
+    }
+
     function onScanSuccess(decodedText) {
       resultDiv.innerText = `🔍 QRコード読み取り成功: ${decodedText}\n`;
 
@@ -70,19 +88,25 @@
         return;
       }
 
-      const endpoint = "https://script.google.com/macros/s/AKfycbxyVaTIhllrKSYdJcXdegrRO1jQba7DVyojUR1k6x5calVoRhYQYIlNpVMU_FyG8YjG8A/exec";
-      const url = `${endpoint}?${decodedText}&area=${encodeURIComponent(area)}&action=${encodeURIComponent(action)}`;
+      html5QrCode.stop().then(() => {
+        resultDiv.innerText += "🛑 カメラ停止中（送信処理のため）\n";
 
-      resultDiv.innerText += `🌐 リクエスト送信: ${url}\n`;
+        const endpoint = "https://script.google.com/macros/s/AKfycbxyVaTIhllrKSYdJcXdegrRO1jQba7DVyojUR1k6x5calVoRhYQYIlNpVMU_FyG8YjG8A/exec";
+        const url = `${endpoint}?${decodedText}&area=${encodeURIComponent(area)}&action=${encodeURIComponent(action)}`;
 
-      fetch(url)
-        .then(res => res.text())
-        .then(txt => {
-          resultDiv.innerText += `✅ 記録成功: ${txt}`;
-        })
-        .catch(err => {
-          resultDiv.innerText += `❌ 記録エラー: ${err}`;
-        });
+        resultDiv.innerText += `🌐 リクエスト送信: ${url}\n`;
+
+        fetch(url)
+          .then(res => res.text())
+          .then(txt => {
+            resultDiv.innerText += `✅ 記録成功: ${txt}`;
+            restartCameraAfterDelay();
+          })
+          .catch(err => {
+            resultDiv.innerText += `❌ 記録エラー: ${err}`;
+            restartCameraAfterDelay();
+          });
+      });
     }
 
     function onScanFailure(error) {
