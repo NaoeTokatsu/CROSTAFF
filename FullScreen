@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>QRスキャン - フルスクリーン</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background-color: black;
+    }
+    #reader {
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    #overlay-ui {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 2;
+      background: rgba(255, 255, 255, 0.85);
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 1.2em;
+    }
+    #status {
+      margin-top: 6px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="reader"></div>
+  <div id="overlay-ui">
+    <div id="area-name">📍 エリア: 読み込み中...</div>
+    <div id="status">📄 ステータス: 待機中</div>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const area = params.get("area") || "未設定";
+    const actionParam = params.get("action");
+
+    document.getElementById("area-name").innerText = `📍 エリア: ${area}`;
+
+    const statusDiv = document.getElementById("status");
+    let html5QrCode = new Html5Qrcode("reader");
+    let lastScannedStaff = null;
+    let lastScannedTime = 0;
+
+    Html5Qrcode.getCameras().then(devices => {
+      const backCam = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
+      html5QrCode.start(
+        backCam.id,
+        { fps: 10, qrbox: { width: 400, height: 400 } },
+        onScanSuccess,
+        () => {}
+      );
+    });
+
+    function onScanSuccess(decodedText) {
+      const now = Date.now();
+      if (decodedText === lastScannedStaff && now - lastScannedTime < 3000) {
+        statusDiv.innerText = "⚠️ 連続スキャン防止中...";
+        return;
+      }
+      lastScannedStaff = decodedText;
+      lastScannedTime = now;
+
+      if (!decodedText.startsWith("staff=")) {
+        statusDiv.innerText = "❌ 無効なQRコード形式";
+        return;
+      }
+
+      statusDiv.innerText = `📤 送信中...`;
+
+      const endpoint = "https://script.google.com/macros/s/AKfycbx85vMW0Rh9zTRqnLfyr4zAjZ-WWVIIB-8CBC46elZfe_cJyCbewoQfRuf0n5nWj5r1/exec";
+      const url = `${endpoint}?${decodedText}&area=${encodeURIComponent(area)}${actionParam ? `&action=${actionParam}` : ''}`;
+
+      fetch(url)
+        .then(res => res.text())
+        .then(txt => {
+          const match = txt.match(/(IN|OUT)/);
+          if (match) {
+            statusDiv.innerText = `✅ ${match[1]} 記録完了`;
+          } else {
+            statusDiv.innerText = `✅ 記録: ${txt}`;
+          }
+        })
+        .catch(err => {
+          statusDiv.innerText = `❌ エラー: ${err}`;
+        });
+    }
+  </script>
+</body>
+</html>
