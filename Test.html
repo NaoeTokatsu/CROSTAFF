@@ -11,17 +11,19 @@
     #camera-select { margin-top: 10px; }
     #version { margin-top: 40px; font-size: 0.9em; color: gray; }
     #location-indicator { font-size: 1.2em; margin: 10px 0; color: #444; }
+    #status-indicator { font-size: 1.3em; margin-top: 10px; color: #222; }
   </style>
 </head>
 <body>
   <h2>QRコードをスキャンしてください</h2>
   <div id="location-indicator">📍 担当エリア: 読み込み中...</div>
+  <div id="status-indicator">📄 ステータス: 未スキャン</div>
   <div>
     <select id="camera-select"></select>
   </div>
   <div id="reader"></div>
   <div id="result">スキャン待機中...</div>
-  <div id="version">CROSTAFF Scanner v1.0.2</div>
+  <div id="version">CROSTAFF Scanner v1.0.3</div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
@@ -30,6 +32,7 @@
     const resultDiv = document.getElementById("result");
     const cameraSelect = document.getElementById("camera-select");
     const locationIndicator = document.getElementById("location-indicator");
+    const statusIndicator = document.getElementById("status-indicator");
 
     locationIndicator.innerText = `📍 担当エリア: ${area}`;
 
@@ -44,11 +47,9 @@
         cameraSelect.appendChild(option);
       });
 
-      // デフォルトは背面カメラっぽいもの（labelに"back"を含む）を選ぶ
       const defaultCamera = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
       currentCameraId = defaultCamera.id;
       startCamera(currentCameraId);
-
       cameraSelect.value = currentCameraId;
 
       cameraSelect.addEventListener("change", (event) => {
@@ -91,9 +92,11 @@
 
     function onScanSuccess(decodedText) {
       resultDiv.innerText = `🔍 QRコード読み取り成功: ${decodedText}\n`;
+      statusIndicator.innerText = "📄 ステータス: 送信中...";
 
       if (!decodedText.startsWith("staff=")) {
         resultDiv.innerText += "❌ 無効なQRコード形式（'staff='で始まっていません）";
+        statusIndicator.innerText = "❌ ステータス: 無効なQRコード";
         return;
       }
 
@@ -116,14 +119,23 @@
           })
           .then(txt => {
             resultDiv.innerText += `✅ 記録成功: ${txt}`;
+
+            const match = txt.match(/(IN|OUT)/);
+            if (match) {
+              statusIndicator.innerText = `✅ ステータス: ${match[1]}`;
+            } else {
+              statusIndicator.innerText = "✅ ステータス: 記録済（状態不明）";
+            }
             restartCameraAfterDelay();
           })
           .catch(err => {
             resultDiv.innerText += `❌ fetch通信エラー: ${err}`;
+            statusIndicator.innerText = `❌ ステータス: 通信エラー`;
             restartCameraAfterDelay();
           });
       }).catch(stopErr => {
         resultDiv.innerText += `❌ カメラ停止時エラー: ${stopErr}`;
+        statusIndicator.innerText = `❌ ステータス: カメラ停止失敗`;
       });
     }
 
