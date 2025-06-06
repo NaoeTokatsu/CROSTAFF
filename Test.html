@@ -6,24 +6,61 @@
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     body { font-family: sans-serif; text-align: center; padding: 20px; }
-    #reader { width: 300px; margin: auto; }
+    #reader { width: 90%; max-width: 500px; margin: auto; }
     #result { margin-top: 20px; font-weight: bold; }
+    #camera-select { margin-top: 10px; }
   </style>
 </head>
 <body>
   <h2>QRコードをスキャンしてください</h2>
+  <div>
+    <select id="camera-select"></select>
+  </div>
   <div id="reader"></div>
   <div id="result">スキャン待機中...</div>
 
   <script>
-    // URLパラメータ（areaとaction）を取得
     const params = new URLSearchParams(window.location.search);
     const area = params.get("area") || "未設定";
     const action = params.get("action") || "未設定";
 
-    // スキャン成功時の処理
+    const html5QrCode = new Html5Qrcode("reader");
+
+    // カメラリスト取得と表示
+    Html5Qrcode.getCameras().then(devices => {
+      const cameraSelect = document.getElementById("camera-select");
+
+      devices.forEach((device, index) => {
+        const option = document.createElement("option");
+        option.value = device.id;
+        option.text = device.label || `カメラ ${index + 1}`;
+        cameraSelect.appendChild(option);
+      });
+
+      if (devices.length > 0) {
+        startCamera(devices[0].id);
+      }
+
+      cameraSelect.addEventListener("change", (event) => {
+        html5QrCode.stop().then(() => {
+          startCamera(event.target.value);
+        });
+      });
+    }).catch(err => {
+      document.getElementById("result").innerText = `❌ カメラ取得エラー: ${err}`;
+    });
+
+    function startCamera(cameraId) {
+      html5QrCode.start(
+        cameraId,
+        { fps: 10, qrbox: { width: 350, height: 350 } },
+        onScanSuccess
+      ).catch(err => {
+        document.getElementById("result").innerText = `❌ カメラ起動エラー: ${err}`;
+      });
+    }
+
     function onScanSuccess(decodedText) {
-      // QRコードには staff=ID という形式の文字列のみを入れる
       if (!decodedText.startsWith("staff=")) {
         document.getElementById("result").innerText = "❌ 無効なQRコードです";
         return;
@@ -41,16 +78,6 @@
           document.getElementById("result").innerText = `❌ 記録エラー: ${err}`;
         });
     }
-
-    // QRコードリーダー起動（前面カメラを使用）
-    const html5QrCode = new Html5Qrcode("reader");
-    html5QrCode.start(
-      { facingMode: "user" },
-      { fps: 10, qrbox: 250 },
-      onScanSuccess
-    ).catch(err => {
-      document.getElementById("result").innerText = `❌ カメラ起動エラー: ${err}`;
-    });
   </script>
 </body>
 </html>
