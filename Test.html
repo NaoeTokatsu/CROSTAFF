@@ -91,7 +91,7 @@
       html5QrCode.stop().then(() => {
         resultDiv.innerText += "🛑 カメラ停止中（送信処理のため）\n";
 
-        const endpoint = "https://script.google.com/macros/s/AKfycbxyVaTIhllrKSYdJcXdegrRO1jQba7DVyojUR1k6x5calVoRhYQYIlNpVMU_FyG8YjG8A/exec";
+        const endpoint = "https://script.google.com/macros/s/AKfycbx85vMW0Rh9zTRqnLfyr4zAjZ-WWVIIB-8CBC46elZfe_cJyCbewoQfRuf0n5nWj5r1/exec";
         const url = `${endpoint}?${decodedText}&area=${encodeURIComponent(area)}&action=${encodeURIComponent(action)}`;
 
         resultDiv.innerText += `🌐 リクエスト送信: ${url}\n`;
