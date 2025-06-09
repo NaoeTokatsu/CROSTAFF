@@ -26,7 +26,7 @@
     #info {
       background: black;
       padding: 0 20px 10px;
-      font-size: 1.6em;
+      font-size: 1.5em;
     }
     #reader-container {
       position: relative;
@@ -39,40 +39,6 @@
       object-fit: cover;
       position: relative;
     }
-    #qrbox-frame {
-      position: absolute;
-      width: 60vw;
-      height: 60vw;
-      border: 3px dashed rgba(255,255,255,0.9);
-      top: 20%;
-      left: 50%;
-      transform: translate(-50%, 0);
-      z-index: 3;
-      pointer-events: none;
-    }
-    #mask {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      z-index: 2;
-      pointer-events: none;
-    }
-    #mask::before {
-      content: "";
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.6);
-      clip-path: polygon(
-        0% 0%, 100% 0%, 100% 100%, 0% 100%,
-        0% 0%,
-        calc(50% - 30vw) calc(20%),
-        calc(50% + 30vw) calc(20%),
-        calc(50% + 30vw) calc(20% + 60vw),
-        calc(50% - 30vw) calc(20% + 60vw),
-        calc(50% - 30vw) calc(20%)
-      );
-    }
     #result-banner {
       position: absolute;
       top: 50%;
@@ -80,9 +46,9 @@
       transform: translate(-50%, -50%);
       background-color: rgba(0, 0, 0, 0.85);
       color: white;
-      font-size: 1.6em;
-      padding: 20px;
-      border-radius: 12px;
+      font-size: 2em;
+      padding: 30px;
+      border-radius: 16px;
       text-align: center;
       z-index: 5;
       display: none;
@@ -92,14 +58,14 @@
       top: 120px;
       left: 20px;
       z-index: 6;
-      font-size: 1.6em;
+      font-size: 1.5em;
     }
   </style>
 </head>
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.0.7</div>
+    <div>v1.1.0</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜ 
@@ -108,8 +74,6 @@
   <select id="camera-select"></select>
   <div id="reader-container">
     <div id="reader"></div>
-    <div id="mask"></div>
-    <div id="qrbox-frame"></div>
     <div id="result-banner"></div>
   </div>
 
@@ -136,59 +100,66 @@
     let currentCameraId = null;
     let lastScan = "";
     let lastTime = 0;
+    let cameraRunning = false;
 
     function showBanner(message) {
       bannerEl.innerText = message;
       bannerEl.style.display = "block";
-      setTimeout(() => bannerEl.style.display = "none", 2000);
+      statusEl.innerText = "処理中...";
+      setTimeout(() => {
+        bannerEl.style.display = "none";
+        statusEl.innerText = "読み取り中";
+      }, 2000);
     }
 
-    function sendLog(staffId, groupCode) {
+    function sendLog(group, staffId) {
       const now = Date.now();
-      const uniqueScan = `${groupCode}-${staffId}`;
-      if (uniqueScan === lastScan && now - lastTime < 3000) return;
-      lastScan = uniqueScan;
+      if (group + staffId === lastScan && now - lastTime < 3000) return;
+      lastScan = group + staffId;
       lastTime = now;
 
-      const url = `${endpoint}?staff=${staffId}&group=${groupCode}&area=${areaCode}`;
-      statusEl.innerText = "送信中...";
+      const url = `${endpoint}?staff=${staffId}&group=${group}&area=${areaCode}`;
       fetch(url).then(r => r.text()).then(result => {
-        let msg = `${groupCode}-${staffId}\n${areaName}\n`;
-        if (result.includes("IN")) msg += "入室処理完了";
-        else if (result.includes("OUT")) msg += "退室処理完了";
+        let msg = `${group}${staffId}\n${areaName}\n`;
+        if (result === "IN") msg += "入室処理完了";
+        else if (result === "OUT") msg += "退室処理完了";
         else msg += `エラー: ${result}`;
         showBanner(msg);
-        statusEl.innerText = "読み取り完了";
-        html5QrCode.stop().then(() => {
-          setTimeout(() => startCamera(currentCameraId), 2000);
-        });
       }).catch(() => {
-        showBanner(`${groupCode}-${staffId}\n${areaName}\n通信エラー`);
+        showBanner(`${group}${staffId}\n${areaName}\n通信エラー`);
         statusEl.innerText = "通信エラー";
-        html5QrCode.stop().then(() => {
-          setTimeout(() => startCamera(currentCameraId), 2000);
-        });
       });
     }
 
+    function decodeQR(decodedText) {
+      if (!decodedText.startsWith("cs25-")) {
+        statusEl.innerText = "無効なコード";
+        return;
+      }
+      const match = decodedText.match(/^cs25-([a-z]{3})(\d{4})$/);
+      if (!match) {
+        statusEl.innerText = "フォーマットエラー";
+        return;
+      }
+      const group = match[1];
+      const staffId = match[2];
+
+      statusEl.innerText = "読み取り済み";
+      sendLog(group, staffId);
+    }
+
     function startCamera(cameraId) {
+      if (cameraRunning) return; // 再起動防止
+
       html5QrCode.start(
         cameraId,
-        { fps: 10, qrbox: { width: 0.6 * window.innerWidth, height: 0.6 * window.innerWidth } },
-        decodedText => {
-          const match = decodedText.match(/^cs25-([a-z]{3})(\d{4})$/);
-          if (!match) {
-            statusEl.innerText = "無効なコード";
-            return;
-          }
-          const groupCode = match[1];
-          const staffId = match[2];
-          sendLog(staffId, groupCode);
-        },
+        { fps: 10, qrbox: { width: 350, height: 350 } },
+        decodeQR,
         () => {
           statusEl.innerText = "読み取り中";
         }
       ).then(() => {
+        cameraRunning = true;
         statusEl.innerText = "読み取り中";
       }).catch(err => {
         statusEl.innerText = "カメラ起動失敗: " + err;
@@ -215,7 +186,10 @@
 
       cameraSelect.addEventListener("change", e => {
         const newCameraId = e.target.value;
-        html5QrCode.stop().then(() => startCamera(newCameraId));
+        html5QrCode.stop().then(() => {
+          cameraRunning = false;
+          startCamera(newCameraId);
+        });
       });
     }).catch(err => {
       statusEl.innerText = `カメラ取得失敗: ${err}`;
