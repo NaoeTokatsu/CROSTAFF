@@ -41,8 +41,8 @@
     }
     #qrbox-frame {
       position: absolute;
-      width: 300px;
-      height: 300px;
+      width: 320px;
+      height: 320px;
       border: 3px dashed rgba(255,255,255,0.9);
       top: 50%;
       left: 50%;
@@ -50,33 +50,25 @@
       z-index: 3;
       pointer-events: none;
     }
-    #mask {
+    #overlay {
       position: absolute;
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
-      background-color: rgba(0,0,0,0.6);
-      clip-path: polygon(
-        0 0, 100% 0, 100% 100%, 0 100%,
-        0 0,
-        calc(50% - 150px) calc(50% - 150px),
-        calc(50% + 150px) calc(50% - 150px),
-        calc(50% + 150px) calc(50% + 150px),
-        calc(50% - 150px) calc(50% + 150px),
-        calc(50% - 150px) calc(50% - 150px)
-      );
-      z-index: 2;
-      pointer-events: none;
+      background-color: rgba(0, 0, 0, 0.85);
+      z-index: 4;
+      display: none;
     }
     #result-banner {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background-color: rgba(0, 0, 0, 0.85);
+      background-color: transparent;
       color: white;
       font-size: 2em;
       padding: 30px;
-      border-radius: 16px;
       text-align: center;
       z-index: 5;
       display: none;
@@ -93,7 +85,7 @@
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.4.1</div>
+    <div>v1.5.0</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜ 
@@ -102,7 +94,7 @@
   <select id="camera-select"></select>
   <div id="reader-container">
     <div id="reader"></div>
-    <div id="mask"></div>
+    <div id="overlay"></div>
     <div id="qrbox-frame"></div>
     <div id="result-banner"></div>
   </div>
@@ -122,6 +114,7 @@
     const areaEl = document.getElementById("area-name");
     const statusEl = document.getElementById("status");
     const bannerEl = document.getElementById("result-banner");
+    const overlayEl = document.getElementById("overlay");
     const cameraSelect = document.getElementById("camera-select");
 
     areaEl.textContent = areaName;
@@ -133,40 +126,63 @@
     let cameraRunning = false;
     let readingPaused = false;
 
-    function showBanner(message) {
+    function showOverlay(message, color = 'white') {
+      overlayEl.style.display = "block";
       bannerEl.innerText = message;
+      bannerEl.style.color = color;
       bannerEl.style.display = "block";
-      statusEl.innerText = "処理中...";
-      setTimeout(() => {
-        bannerEl.style.display = "none";
-        statusEl.innerText = "読み取り中";
-        readingPaused = false;
-      }, 2000);
+    }
+
+    function hideOverlay() {
+      overlayEl.style.display = "none";
+      bannerEl.style.display = "none";
+    }
+
+    function updateStatus(phase) {
+      const map = {
+        waiting: { text: "スキャン中", color: "white" },
+        scanned: { text: "スキャン成功", color: "yellow" },
+        processing: { text: "処理中", color: "orange" },
+        error: { text: "通信エラー", color: "red" }
+      };
+      statusEl.innerText = map[phase].text;
+      statusEl.style.color = map[phase].color;
     }
 
     function sendLog(staffId) {
+      updateStatus("processing");
       const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
       fetch(url).then(r => r.text()).then(result => {
         let msg = `${staffId}\n${areaName}\n`;
         if (result === "1") msg += "入室処理完了";
         else if (result === "2") msg += "退室処理完了";
         else msg += `エラー: ${result}`;
-        showBanner(msg);
+        showOverlay(msg, result === "1" ? "lime" : result === "2" ? "skyblue" : "red");
+        setTimeout(() => {
+          hideOverlay();
+          updateStatus("waiting");
+          readingPaused = false;
+        }, 2000);
       }).catch(() => {
-        showBanner(`${staffId}\n${areaName}\n通信エラー`);
-        statusEl.innerText = "通信エラー";
+        showOverlay(`${staffId}\n${areaName}\n通信エラー`, "red");
+        updateStatus("error");
+        setTimeout(() => {
+          hideOverlay();
+          updateStatus("waiting");
+          readingPaused = false;
+        }, 2000);
       });
     }
 
     function decodeQR(decodedText) {
       if (readingPaused) return;
       if (!decodedText.startsWith("cs25-")) {
-        statusEl.innerText = "無効なコード";
+        updateStatus("error");
         return;
       }
       const match = decodedText.match(/^cs25-([a-z]{3}\d{4})$/);
       if (!match) {
-        statusEl.innerText = "フォーマットエラー";
+        updateStatus("error");
         return;
       }
 
@@ -177,7 +193,8 @@
       lastTime = now;
       readingPaused = true;
 
-      statusEl.innerText = "読み取り済み";
+      updateStatus("scanned");
+      showOverlay("処理中", "yellow");
       sendLog(staffId);
     }
 
@@ -185,21 +202,21 @@
       if (cameraRunning) return;
       html5QrCode.start(
         cameraId,
-        { fps: 10, qrbox: { width: 300, height: 300 } },
+        { fps: 10, qrbox: { width: 320, height: 320 } },
         decodeQR,
-        () => {
-          statusEl.innerText = "読み取り中";
-        }
+        () => updateStatus("waiting")
       ).then(() => {
         cameraRunning = true;
-        statusEl.innerText = "読み取り中";
+        updateStatus("waiting");
       }).catch(err => {
+        updateStatus("error");
         statusEl.innerText = "カメラ起動失敗: " + err;
       });
     }
 
     Html5Qrcode.getCameras().then(devices => {
       if (devices.length === 0) {
+        updateStatus("error");
         statusEl.innerText = "カメラが見つかりません";
         return;
       }
@@ -224,6 +241,7 @@
         });
       });
     }).catch(err => {
+      updateStatus("error");
       statusEl.innerText = `カメラ取得失敗: ${err}`;
     });
   </script>
