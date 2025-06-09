@@ -55,19 +55,31 @@
       color: #007b43;
       font-weight: bold;
     }
-    #processing-banner {
+    .banner {
       position: fixed;
       top: 42%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.85);
-      color: white;
       padding: 24px 36px;
       border-radius: 16px;
       font-size: 1.8em;
       font-weight: bold;
-      z-index: 100;
+      text-align: center;
+      white-space: pre-line;
       display: none;
+      z-index: 100;
+    }
+    #processing-banner {
+      background: rgba(0, 0, 0, 0.85);
+      color: white;
+    }
+    #result-banner {
+      background: rgba(0, 0, 0, 0.85);
+      color: white;
+    }
+    #error-banner {
+      background: #e53935;
+      color: white;
     }
   </style>
 </head>
@@ -79,7 +91,9 @@
 
   <div id="reader-container">
     <div id="reader"></div>
-    <div id="processing-banner">処理中...</div>
+    <div id="processing-banner" class="banner">処理中...</div>
+    <div id="result-banner" class="banner"></div>
+    <div id="error-banner" class="banner"></div>
   </div>
 
   <div id="footer">
@@ -91,79 +105,114 @@
     const reader = new Html5Qrcode("reader");
     const cameraSelect = document.getElementById("camera-select");
     const processingBanner = document.getElementById("processing-banner");
+    const resultBanner = document.getElementById("result-banner");
+    const errorBanner = document.getElementById("error-banner");
+
+    const areaMap = {
+      "バックステージ": "obs",
+      "小講堂": "osa",
+      "男子更衣室": "mcr",
+      "女子更衣室": "wcr"
+    };
+    const reverseAreaMap = {
+      "obs": "バックステージ",
+      "osa": "小講堂",
+      "mcr": "男子更衣室",
+      "wcr": "女子更衣室",
+      "unk": "未設定"
+    };
+
+    const params = new URLSearchParams(location.search);
+    const areaName = params.get("area") || "未設定";
+    const areaCode = areaMap[areaName] || "unk";
+
+    const endpoint = "https://script.google.com/macros/s/AKfycbx0v1nlONAziZzoQratUpF98n_I8l7sjkn2kWOZs3iJdz2doO9WFv7ILmKBKumO0S2SKw/exec";
 
     let currentCameraId = null;
     let scanning = false;
     let lastScan = "";
     let lastTime = 0;
 
+    function showBanner(element, message, duration = 3000) {
+      element.innerText = message;
+      element.style.display = "block";
+      setTimeout(() => {
+        element.style.display = "none";
+      }, duration);
+    }
+
+    async function sendToGAS(staffId) {
+      showBanner(processingBanner, "処理中...");
+      const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
+      try {
+        const res = await fetch(url);
+        const text = await res.text();
+        const [code, area, id] = text.trim().split(",");
+        const areaFull = reverseAreaMap[area] || "未設定";
+        let msg = "";
+        if (code === "1") {
+          msg = `記録成功\n入室\n${id}\n${areaFull}`;
+        } else if (code === "2") {
+          msg = `記録成功\n退室\n${id}\n${areaFull}`;
+        } else {
+          msg = `記録失敗\n${id}\n${areaFull}`;
+        }
+        showBanner(resultBanner, msg, 3000);
+      } catch (err) {
+        showBanner(errorBanner, "通信エラー\n記録できませんでした", 4000);
+      }
+    }
+
     async function startCamera(cameraId) {
       if (scanning) {
-        await reader.stop().catch(err => console.warn("停止失敗:", err));
+        await reader.stop().catch(() => {});
         scanning = false;
       }
       try {
         await reader.start(
           cameraId,
           { fps: 10 },
-          decodedText => {
+          async decodedText => {
             const now = Date.now();
-            if (decodedText === lastScan && now - lastTime < 2000) return;
-            lastScan = decodedText;
+            if (!decodedText.startsWith("cs25-")) {
+              showBanner(errorBanner, "無効なQRコード");
+              return;
+            }
+            const staffId = decodedText.slice(5);
+            if (staffId === lastScan && now - lastTime < 2500) return;
+            lastScan = staffId;
             lastTime = now;
-
-            showProcessingBanner();
             scanning = false;
-
-            console.log("QR読み取り成功:", decodedText);
-            // ↓ 実際の送信処理などをここで行う場合は非同期処理を追加
-
-            setTimeout(() => {
-              hideProcessingBanner();
-              startCamera(currentCameraId); // 再起動
-            }, 3000); // 処理中表示時間
+            await sendToGAS(staffId);
+            await startCamera(cameraId);
           },
-          error => {
-            // スキャンエラー無視
-          }
+          () => {}
         );
         scanning = true;
-      } catch (e) {
-        alert("カメラ起動失敗: " + e.message);
-        console.error(e);
+      } catch (err) {
+        showBanner(errorBanner, "カメラ起動失敗\n" + err.message);
       }
-    }
-
-    function showProcessingBanner() {
-      processingBanner.style.display = "block";
-    }
-
-    function hideProcessingBanner() {
-      processingBanner.style.display = "none";
     }
 
     Html5Qrcode.getCameras().then(devices => {
       if (devices.length === 0) {
-        alert("カメラが見つかりません");
+        showBanner(errorBanner, "カメラが見つかりません");
         return;
       }
-      devices.forEach((device, index) => {
+      devices.forEach((device, i) => {
         const option = document.createElement("option");
         option.value = device.id;
-        option.text = device.label || `カメラ${index + 1}`;
+        option.text = device.label || `カメラ${i + 1}`;
         cameraSelect.appendChild(option);
       });
       currentCameraId = devices[0].id;
       cameraSelect.value = currentCameraId;
       startCamera(currentCameraId);
-    }).catch(err => {
-      alert("カメラ取得失敗: " + err.message);
     });
 
     cameraSelect.addEventListener("change", () => {
-      const newId = cameraSelect.value;
-      currentCameraId = newId;
-      startCamera(newId);
+      currentCameraId = cameraSelect.value;
+      startCamera(currentCameraId);
     });
   </script>
 </body>
