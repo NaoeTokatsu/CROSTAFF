@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>CROSTAFF2025 QR Scanner</title>
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.9" type="text/javascript"></script>
   <style>
     body, html {
       margin: 0;
@@ -75,7 +75,7 @@
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.2.0</div>
+    <div>v1.2.1</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜
@@ -97,16 +97,18 @@
       "女子更衣室": "WCR"
     };
 
-    const params = new URLSearchParams(location.search);
+    const params = new URLSearchParams(window.location.search);
     const areaName = params.get("area") || "未設定";
     const areaCode = areaMap[areaName] || "UNK";
+    const endpoint = "https://script.google.com/macros/s/AKfycbx85vMW0Rh9zTRqnLfyr4zAjZ-WWVIIB-8CBC46elZfe_cJyCbewoQfRuf0n5nWj5r1/exec";
 
     const statusEl = document.getElementById("status");
     const bannerEl = document.getElementById("result-banner");
     const cameraSelect = document.getElementById("camera-select");
     document.getElementById("area-name").innerText = areaName;
 
-    const html5QrCode = new Html5Qrcode("reader");
+    let html5QrCode;
+    let currentCameraId = null;
     let lastScan = "";
     let lastTime = 0;
 
@@ -121,60 +123,74 @@
       if (staffId === lastScan && now - lastTime < 3000) return;
       lastScan = staffId;
       lastTime = now;
-
-      const url = `https://script.google.com/macros/s/AKfycbx85vMW0Rh9zTRqnLfyr4zAjZ-WWVIIB-8CBC46elZfe_cJyCbewoQfRuf0n5nWj5r1/exec?staff=${staffId}&area=${areaCode}`;
+      const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
       statusEl.innerText = "送信中...";
-
-      fetch(url).then(r => r.text()).then(result => {
-        let msg = `${staffId}\n${areaName}\n`;
-        if (result.includes("IN")) msg += "入室処理完了";
-        else if (result.includes("OUT")) msg += "退室処理完了";
-        else msg += `エラー: ${result}`;
-        showBanner(msg);
-        statusEl.innerText = "読み取り中";
-      }).catch(() => {
-        showBanner(`${staffId}\n${areaName}\n通信エラー`);
-        statusEl.innerText = "通信エラー";
-      });
+      fetch(url)
+        .then(res => res.text())
+        .then(txt => {
+          let msg = `${staffId}\n${areaName}\n`;
+          if (txt.includes("IN")) msg += "入室処理完了";
+          else if (txt.includes("OUT")) msg += "退室処理完了";
+          else msg += `エラー: ${txt}`;
+          showBanner(msg);
+          statusEl.innerText = "読み取り中";
+        })
+        .catch(() => {
+          showBanner(`${staffId}\n${areaName}\n通信エラー`);
+          statusEl.innerText = "通信エラー";
+        });
     }
 
     function startScanner(cameraId) {
-      html5QrCode.stop().catch(() => {}).finally(() => {
-        html5QrCode.start(
-          cameraId,
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText) => {
-            if (!decodedText.startsWith("cs25=")) {
-              statusEl.innerText = "不正なコード";
-              return;
-            }
-            const staffId = decodedText.split("=")[1];
-            sendLog(staffId);
-          },
-          () => {
-            statusEl.innerText = "読み取り中";
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          initScanner(cameraId);
+        }).catch(() => {
+          initScanner(cameraId);
+        });
+      } else {
+        initScanner(cameraId);
+      }
+    }
+
+    function initScanner(cameraId) {
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { deviceId: { exact: cameraId } },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          if (!decodedText.startsWith("cs25=")) {
+            statusEl.innerText = "不正なコード";
+            return;
           }
-        );
+          const staffId = decodedText.split("=")[1];
+          sendLog(staffId);
+        },
+        () => {
+          statusEl.innerText = "読み取り中";
+        }
+      ).catch(err => {
+        statusEl.innerText = "カメラ起動失敗";
       });
     }
 
     Html5Qrcode.getCameras().then(cameras => {
-      if (cameras && cameras.length) {
-        cameras.forEach(c => {
-          const opt = document.createElement("option");
-          opt.value = c.id;
-          opt.text = c.label || "カメラ";
-          cameraSelect.appendChild(opt);
-        });
-        const defaultCam = cameras.find(c => c.label.toLowerCase().includes("back")) || cameras[0];
-        cameraSelect.value = defaultCam.id;
-        startScanner(defaultCam.id);
-        cameraSelect.onchange = () => startScanner(cameraSelect.value);
-      } else {
+      if (cameras.length === 0) {
         statusEl.innerText = "カメラが見つかりません";
+        return;
       }
+      cameras.forEach(cam => {
+        const option = document.createElement("option");
+        option.value = cam.id;
+        option.text = cam.label || `カメラ${cameraSelect.length + 1}`;
+        cameraSelect.appendChild(option);
+      });
+      const defaultCamera = cameras.find(c => c.label.toLowerCase().includes("back")) || cameras[0];
+      cameraSelect.value = defaultCamera.id;
+      startScanner(defaultCamera.id);
+      cameraSelect.onchange = () => startScanner(cameraSelect.value);
     }).catch(() => {
-      statusEl.innerText = "カメラ初期化失敗";
+      statusEl.innerText = "カメラ取得失敗";
     });
   </script>
 </body>
