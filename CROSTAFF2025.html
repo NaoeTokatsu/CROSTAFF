@@ -54,21 +54,24 @@
       position: absolute;
       width: 100%;
       height: 100%;
-      background-color: rgba(0,0,0,0.6);
       z-index: 2;
       pointer-events: none;
     }
     #mask::before {
       content: "";
       position: absolute;
-      top: 20%;
-      left: 50%;
-      width: 60vw;
-      height: 60vw;
-      transform: translate(-50%, 0);
-      background-color: transparent;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,0.6);
-      border-radius: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.6);
+      clip-path: polygon(
+        0% 0%, 100% 0%, 100% 100%, 0% 100%,
+        0% 0%,
+        calc(50% - 30vw) calc(20%),
+        calc(50% + 30vw) calc(20%),
+        calc(50% + 30vw) calc(20% + 60vw),
+        calc(50% - 30vw) calc(20% + 60vw),
+        calc(50% - 30vw) calc(20%)
+      );
     }
     #result-banner {
       position: absolute;
@@ -96,7 +99,7 @@
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.0.6</div>
+    <div>v1.0.7</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜ 
@@ -155,10 +158,16 @@
         else if (result.includes("OUT")) msg += "退室処理完了";
         else msg += `エラー: ${result}`;
         showBanner(msg);
-        statusEl.innerText = "読み取り中";
+        statusEl.innerText = "読み取り完了";
+        html5QrCode.stop().then(() => {
+          setTimeout(() => startCamera(currentCameraId), 2000);
+        });
       }).catch(() => {
         showBanner(`${groupCode}-${staffId}\n${areaName}\n通信エラー`);
         statusEl.innerText = "通信エラー";
+        html5QrCode.stop().then(() => {
+          setTimeout(() => startCamera(currentCameraId), 2000);
+        });
       });
     }
 
