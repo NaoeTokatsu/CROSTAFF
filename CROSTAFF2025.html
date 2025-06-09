@@ -26,10 +26,14 @@
     #info {
       background: black;
       padding: 0 30px 15px;
-      font-size: 1.5em;
-      font-weight: bold;
       display: flex;
       justify-content: space-between;
+      align-items: center;
+    }
+    #area-name,
+    #status {
+      font-size: 1.8em;
+      font-weight: bold;
     }
     #reader-container {
       position: relative;
@@ -82,7 +86,7 @@
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.0.0</div>
+    <div>v1.0.1</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span>
@@ -151,6 +155,9 @@
         } else if (result === "2") {
           msg += "退室処理完了";
           showBanner(msg, "skyblue", () => updateStatus("スキャン中", "white"));
+        } else if (result === "OK" || result === "SUCCESS") {
+          msg += "記録成功";
+          showBanner(msg, "limegreen", () => updateStatus("スキャン中", "white"));
         } else {
           msg += `エラー: ${result}`;
           showBanner(msg, "red", () => updateStatus("処理失敗", "red"));
@@ -171,7 +178,7 @@
             updateStatus("無効なコード", "orange");
             return;
           }
-          const staffId = decodedText.slice(5); // 例: "cs25-aaa1234" → "aaa1234"
+          const staffId = decodedText.slice(5); // 「cs25-aaa1234」→「aaa1234」
           sendLog(staffId);
         },
         () => updateStatus("スキャン中", "white")
