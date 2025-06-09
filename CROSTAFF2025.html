@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>CROSTAFF QR Scanner</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.4.1"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     html, body {
@@ -185,7 +185,6 @@
     const params = new URLSearchParams(location.search);
     const areaName = params.get("area") || "未設定";
     const areaCode = areaMap[areaName] || "unk";
-    // 必要に応じてデプロイID修正！
     const endpoint = "https://script.google.com/macros/s/AKfycbx0v1nlONAziZzoQratUpF98n_I8l7sjkn2kWOZs3iJdz2doO9WFv7ILmKBKumO0S2SKw/exec";
 
     const areaEl = document.getElementById("area-name");
@@ -202,7 +201,7 @@
     let scanning = false;
     let lastScan = "";
     let lastTime = 0;
-    let retryTimeout = null;
+    let cameraInitLock = false; // 多重カメラ初期化防止
 
     function updateStatus(message) {
       statusEl.textContent = message;
@@ -270,19 +269,34 @@
         });
     }
 
-    function startCamera(cameraId) {
-      if(html5QrCode) {
-        html5QrCode.clear();
+    // 安全なカメラ初期化（多重呼び出し防止）
+    async function startCamera(cameraId) {
+      if (cameraInitLock) return;
+      cameraInitLock = true;
+      updateStatus("カメラ準備中...");
+      scanning = false;
+
+      if (html5QrCode) {
+        try {
+          // stopとclearはセットで
+          if (html5QrCode._isScanning) {
+            await html5QrCode.stop();
+          }
+          await html5QrCode.clear();
+        } catch (e) {
+          // 既にノード削除済みなどのエラーは握りつぶす
+        }
+        html5QrCode = null;
       }
+
       html5QrCode = new Html5Qrcode("reader");
       scanning = true;
       updateStatus("スキャン中");
-
       html5QrCode.start(
         cameraId,
         {
           fps: 10,
-          qrbox: () => false, // 枠なし
+          qrbox: () => false,
           aspectRatio: 1.0,
           experimentalFeatures: { useBarCodeDetectorIfSupported: true }
         },
@@ -306,25 +320,14 @@
         updateStatus("カメラ起動失敗: " + err);
         showErrorBanner("カメラ起動失敗\n" + err, 6000);
         scanning = false;
+        html5QrCode = null;
+      }).finally(() => {
+        cameraInitLock = false;
       });
     }
 
-    function tryStartCamera(cameras, preferredType) {
-      // Try preferredType ("back" or "front")
-      let selected = cameras.find(d => d.label && d.label.toLowerCase().includes(preferredType));
-      if (!selected) selected = cameras[0];
-      if(selected){
-        currentCameraId = selected.id;
-        cameraSelect.value = selected.id;
-        startCamera(selected.id);
-      } else {
-        showErrorBanner("利用可能なカメラが見つかりません", 6000);
-        updateStatus("カメラなし");
-        scanning = false;
-      }
-    }
-
-    function listAndInitCameras() {
+    // カメラ一覧と切替
+    function populateCamerasAndInit() {
       Html5Qrcode.getCameras().then(devices => {
         cameraSelect.innerHTML = "";
         if (devices.length === 0) {
@@ -335,35 +338,30 @@
         devices.forEach((device, idx) => {
           const option = document.createElement("option");
           option.value = device.id;
-          option.text = device.label || `カメラ ${idx+1}`;
+          let name = device.label || `カメラ${idx+1}`;
+          if (/back/i.test(name)) name += "（背面）";
+          if (/front/i.test(name)) name += "（前面）";
+          option.text = name;
           cameraSelect.appendChild(option);
         });
-        // Try back camera first if available, otherwise first one
-        tryStartCamera(devices, "back");
+        let defaultDevice = devices.find(d => /back/i.test(d.label)) || devices[0];
+        currentCameraId = defaultDevice.id;
+        cameraSelect.value = defaultDevice.id;
+        startCamera(defaultDevice.id);
       }).catch(err => {
         updateStatus("カメラ取得失敗: " + err);
         showErrorBanner("カメラ取得失敗\n" + err, 7000);
       });
     }
 
-    cameraSelect.addEventListener("change", e => {
+    cameraSelect.addEventListener("change", async e => {
       const newCameraId = e.target.value;
       updateStatus("カメラ切替中...");
       scanning = false;
-      if (html5QrCode) {
-        html5QrCode.stop()
-          .then(() => startCamera(newCameraId))
-          .catch(err => {
-            updateStatus("カメラ切替失敗: " + err);
-            showErrorBanner("カメラ切替失敗\n" + err, 6000);
-          });
-      } else {
-        startCamera(newCameraId);
-      }
+      await startCamera(newCameraId);
     });
 
-    // 初期化
-    window.onload = listAndInitCameras;
+    window.onload = populateCamerasAndInit;
   </script>
 </body>
 </html>
