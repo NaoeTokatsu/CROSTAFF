@@ -23,12 +23,12 @@
       background: black;
       padding: 10px 20px;
       font-weight: 900;
-      font-size: 2em;
+      font-size: 3em;
     }
     #info {
       background: black;
       padding: 0 20px 10px;
-      font-size: 1.5em;
+      font-size: 2.25em;
     }
     #reader-container {
       position: relative;
@@ -43,43 +43,36 @@
     }
     #qrbox-frame {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 50vmin;
-      height: 50vmin;
-      max-width: 90vw;
-      max-height: 90vh;
       border: 4px dashed rgba(255,255,255,0.9);
-      transform: translate(-50%, -50%);
       z-index: 3;
       pointer-events: none;
     }
     #result-banner {
       position: absolute;
-      top: 50%;
+      top: 35%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background-color: rgba(0, 0, 0, 0.85);
       font-size: 2.5em;
       font-weight: 700;
       padding: 30px;
       text-align: center;
       z-index: 5;
       display: none;
+      border-radius: 12px;
     }
     #camera-select {
       position: absolute;
       top: 120px;
       left: 20px;
       z-index: 6;
-      font-size: 1.5em;
+      font-size: 2.25em;
     }
   </style>
 </head>
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.5.4</div>
+    <div>v1.6.0</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜ 
@@ -93,6 +86,8 @@
   </div>
 
   <script>
+    const qrboxSize = Math.floor(Math.min(window.innerWidth, window.innerHeight) * 0.5);
+
     const areaMap = {
       "バックステージ": "obs",
       "小講堂": "osa",
@@ -108,18 +103,24 @@
     const statusEl = document.getElementById("status");
     const bannerEl = document.getElementById("result-banner");
     const cameraSelect = document.getElementById("camera-select");
+    const qrboxFrame = document.getElementById("qrbox-frame");
 
     areaEl.textContent = areaName;
+
+    qrboxFrame.style.width = qrboxSize + "px";
+    qrboxFrame.style.height = qrboxSize + "px";
+    qrboxFrame.style.top = `calc(50% - ${qrboxSize / 2}px)`;
+    qrboxFrame.style.left = `calc(50% - ${qrboxSize / 2}px)`;
 
     let html5QrCode = new Html5Qrcode("reader");
     let currentCameraId = null;
     let lastScan = "";
     let lastTime = 0;
-    let cameraRunning = false;
     let readingPaused = false;
 
-    function showBanner(message) {
+    function showBanner(message, color) {
       bannerEl.innerText = message;
+      bannerEl.style.backgroundColor = color;
       bannerEl.style.display = "block";
     }
 
@@ -127,63 +128,55 @@
       bannerEl.style.display = "none";
     }
 
-    function updateStatus(phase) {
-      const map = {
-        waiting: { text: "スキャン中", color: "white" },
-        scanned: { text: "処理中", color: "orange" },
-        successIn: { text: "入室完了", color: "lime" },
-        successOut: { text: "退室完了", color: "skyblue" },
-        error: { text: "通信エラー", color: "red" }
-      };
-      if (map[phase]) {
-        statusEl.innerText = map[phase].text;
-        statusEl.style.color = map[phase].color;
-      }
+    function updateStatus(text, color = "white") {
+      statusEl.innerText = text;
+      statusEl.style.color = color;
     }
 
     function sendLog(staffId) {
-      updateStatus("scanned");
-      const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
-      fetch(url).then(r => r.text()).then(result => {
-        let msg = `${staffId}\n${areaName}\n`;
-        if (result === "1") {
-          msg += "入室処理完了";
-          updateStatus("successIn");
-        } else if (result === "2") {
-          msg += "退室処理完了";
-          updateStatus("successOut");
-        } else {
-          msg += `エラー: ${result}`;
-          updateStatus("error");
-        }
-        showBanner(msg);
-        setTimeout(() => {
-          hideBanner();
-          updateStatus("waiting");
-          readingPaused = false;
-        }, 2000);
-      }).catch(() => {
-        updateStatus("error");
-        showBanner(`${staffId}\n${areaName}\n通信エラー`);
-        setTimeout(() => {
-          hideBanner();
-          updateStatus("waiting");
-          readingPaused = false;
-        }, 2000);
-      });
+      updateStatus("処理中", "orange");
+      fetch(`${endpoint}?staff=${staffId}&area=${areaCode}`)
+        .then(res => res.text())
+        .then(result => {
+          let msg = `${staffId}\n${areaName}\n`;
+          let color = "gray";
+          if (result === "1") {
+            msg += "入室処理完了";
+            color = "lime";
+            updateStatus("入室完了", color);
+          } else if (result === "2") {
+            msg += "退室処理完了";
+            color = "skyblue";
+            updateStatus("退室完了", color);
+          } else {
+            msg += `エラー: ${result}`;
+            color = "red";
+            updateStatus("通信エラー", color);
+          }
+          showBanner(msg, color);
+          setTimeout(() => {
+            hideBanner();
+            updateStatus("スキャン中");
+            readingPaused = false;
+          }, 2000);
+        })
+        .catch(() => {
+          updateStatus("通信エラー", "red");
+          showBanner(`${staffId}\n${areaName}\n通信エラー`, "red");
+          setTimeout(() => {
+            hideBanner();
+            updateStatus("スキャン中");
+            readingPaused = false;
+          }, 2000);
+        });
     }
 
     function decodeQR(decodedText) {
       if (readingPaused) return;
-      if (!decodedText.startsWith("cs25-")) {
-        updateStatus("error");
-        return;
-      }
+      if (!decodedText.startsWith("cs25-")) return;
+
       const match = decodedText.match(/^cs25-([a-z]{3}\d{4})$/);
-      if (!match) {
-        updateStatus("error");
-        return;
-      }
+      if (!match) return;
 
       const now = Date.now();
       const staffId = match[1];
@@ -196,31 +189,17 @@
     }
 
     function startCamera(cameraId) {
-      if (cameraRunning) return;
       html5QrCode.start(
         cameraId,
-        {
-          fps: 10,
-          qrbox: {
-            width: Math.min(window.innerWidth, window.innerHeight) * 0.5,
-            height: Math.min(window.innerWidth, window.innerHeight) * 0.5
-          }
-        },
+        { fps: 10, qrbox: { width: qrboxSize, height: qrboxSize } },
         decodeQR,
-        () => updateStatus("waiting")
-      ).then(() => {
-        cameraRunning = true;
-        updateStatus("waiting");
-      }).catch(err => {
-        updateStatus("error");
-        statusEl.innerText = "カメラ起動失敗: " + err;
-      });
+        () => updateStatus("スキャン中")
+      ).catch(err => updateStatus("カメラ起動失敗", "red"));
     }
 
     Html5Qrcode.getCameras().then(devices => {
       if (devices.length === 0) {
-        updateStatus("error");
-        statusEl.innerText = "カメラが見つかりません";
+        updateStatus("カメラが見つかりません", "red");
         return;
       }
 
@@ -237,15 +216,10 @@
       startCamera(currentCameraId);
 
       cameraSelect.addEventListener("change", e => {
-        const newCameraId = e.target.value;
         html5QrCode.stop().then(() => {
-          cameraRunning = false;
-          startCamera(newCameraId);
+          startCamera(e.target.value);
         });
       });
-    }).catch(err => {
-      updateStatus("error");
-      statusEl.innerText = `カメラ取得失敗: ${err}`;
     });
   </script>
 </body>
