@@ -44,7 +44,7 @@
     }
     #footer {
       position: fixed;
-      bottom: 15px;
+      bottom: 0;
       width: 100vw;
       height: 115px;
       background: #007b43;
@@ -154,8 +154,7 @@
         const text = await res.text();
         const [code, area, id] = text.trim().split(",");
         const areaFull = reverseAreaMap[area] || "未設定";
-        let msg = "";
-        let bg = "";
+        let msg = "", bg = "";
         if (code === "1") {
           msg = `記録成功\n入室\n${id}\n${areaFull}`;
           bg = "#34c759";
@@ -167,7 +166,7 @@
           bg = "#e53935";
         }
         showBanner(resultBanner, msg, bg, 3000);
-        setStatus("スキャン中");
+        setStatus("停止中");
       } catch (err) {
         showBanner(errorBanner, "通信エラー\n記録できませんでした", "#e53935", 4000);
         setStatus("通信エラー");
@@ -195,10 +194,10 @@
             lastScan = staffId;
             lastTime = now;
             scanning = false;
+            await reader.stop(); // 読み取り後に停止
             await sendToGAS(staffId);
-            await startCamera(cameraId); // 再起動
           },
-          () => {} // スキャン失敗時は無視
+          () => {}
         );
         scanning = true;
         setStatus("スキャン中");
