@@ -59,6 +59,7 @@
       text-align: center;
       z-index: 5;
       display: none;
+      white-space: pre-line;
     }
     #camera-select {
       position: absolute;
@@ -157,24 +158,28 @@
       const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
       fetch(url).then(r => r.text()).then(result => {
         const readableArea = reverseAreaMap[areaCode] || areaCode;
-        let msg = "";
+        let line1 = "";
+        let line2 = "";
 
         if (result === "1") {
-          msg = `記録成功：${staffId}：${readableArea}：入室`;
-          showBanner(msg, "limegreen", () => updateStatus("スキャン中", "white"));
+          line1 = "記録成功";
+          line2 = `${staffId} ${readableArea} 入室`;
+          showBanner(`${line1}\n${line2}`, "limegreen", () => updateStatus("スキャン中", "white"));
         } else if (result === "2") {
-          msg = `記録成功：${staffId}：${readableArea}：退室`;
-          showBanner(msg, "skyblue", () => updateStatus("スキャン中", "white"));
+          line1 = "記録成功";
+          line2 = `${staffId} ${readableArea} 退室`;
+          showBanner(`${line1}\n${line2}`, "skyblue", () => updateStatus("スキャン中", "white"));
         } else if (["OK", "SUCCESS", "記録成功"].includes(result)) {
-          msg = `記録成功：${staffId}：${readableArea}`;
-          showBanner(msg, "limegreen", () => updateStatus("スキャン中", "white"));
+          line1 = "記録成功";
+          line2 = `${staffId} ${readableArea}`;
+          showBanner(`${line1}\n${line2}`, "limegreen", () => updateStatus("スキャン中", "white"));
         } else {
-          msg = `記録失敗：${result}`;
-          showBanner(msg, "red", () => updateStatus("記録失敗", "red"));
+          line1 = "記録失敗";
+          line2 = result;
+          showBanner(`${line1}\n${line2}`, "red", () => updateStatus("記録失敗", "red"));
         }
       }).catch(() => {
-        const msg = `記録失敗：通信エラー`;
-        showBanner(msg, "red", () => updateStatus("通信エラー", "red"));
+        showBanner("記録失敗\n通信エラー", "red", () => updateStatus("通信エラー", "red"));
       });
     }
 
@@ -184,10 +189,11 @@
         {
           fps: 10,
           qrbox: (w, h) => {
+            const size = 500;
             return {
-              width: 600,
-              height: 600,
-              x: (w - 600) / 2,
+              width: size,
+              height: size,
+              x: (w - size) / 2,
               y: 300
             };
           },
@@ -199,7 +205,7 @@
             updateStatus("無効なコード", "orange");
             return;
           }
-          const staffId = decodedText.slice(5); // 「cs25-aaa1234」→「aaa1234」
+          const staffId = decodedText.slice(5);
           sendLog(staffId);
         },
         () => updateStatus("スキャン中", "white")
