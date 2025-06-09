@@ -52,22 +52,12 @@
       z-index: 3;
       pointer-events: none;
     }
-    #overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.85);
-      z-index: 4;
-      display: none;
-    }
     #result-banner {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background-color: transparent;
+      background-color: rgba(0, 0, 0, 0.85);
       color: white;
       font-size: 2.5em;
       font-weight: 700;
@@ -88,7 +78,7 @@
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.5.1</div>
+    <div>v1.5.2</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜ 
@@ -97,7 +87,6 @@
   <select id="camera-select"></select>
   <div id="reader-container">
     <div id="reader"></div>
-    <div id="overlay"></div>
     <div id="qrbox-frame"></div>
     <div id="result-banner"></div>
   </div>
@@ -117,7 +106,6 @@
     const areaEl = document.getElementById("area-name");
     const statusEl = document.getElementById("status");
     const bannerEl = document.getElementById("result-banner");
-    const overlayEl = document.getElementById("overlay");
     const cameraSelect = document.getElementById("camera-select");
 
     areaEl.textContent = areaName;
@@ -129,54 +117,58 @@
     let cameraRunning = false;
     let readingPaused = false;
 
-    function showOverlay(message, color = 'white') {
-      overlayEl.style.display = "block";
+    function showBanner(message, color = 'white') {
       bannerEl.innerText = message;
       bannerEl.style.color = color;
       bannerEl.style.display = "block";
     }
 
-    function hideOverlay() {
-      overlayEl.style.display = "none";
+    function hideBanner() {
       bannerEl.style.display = "none";
     }
 
     function updateStatus(phase) {
       const map = {
         waiting: { text: "スキャン中", color: "white" },
-        scanned: { text: "スキャン成功", color: "yellow" },
-        processing: { text: "処理中", color: "orange" },
+        scanned: { text: "処理中", color: "orange" },
+        successIn: { text: "入室完了", color: "lime" },
+        successOut: { text: "退室完了", color: "skyblue" },
         error: { text: "通信エラー", color: "red" }
       };
-      statusEl.innerText = map[phase].text;
-      statusEl.style.color = map[phase].color;
+      if (map[phase]) {
+        statusEl.innerText = map[phase].text;
+        statusEl.style.color = map[phase].color;
+      }
     }
 
     function sendLog(staffId) {
-      updateStatus("processing");
+      updateStatus("scanned");
       const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
       fetch(url).then(r => r.text()).then(result => {
         let msg = `${staffId}\n${areaName}\n`;
         if (result === "1") {
           msg += "入室処理完了";
-          showOverlay(msg, "lime");
+          updateStatus("successIn");
+          showBanner(msg, "lime");
         } else if (result === "2") {
           msg += "退室処理完了";
-          showOverlay(msg, "skyblue");
+          updateStatus("successOut");
+          showBanner(msg, "skyblue");
         } else {
           msg += `エラー: ${result}`;
-          showOverlay(msg, "red");
+          updateStatus("error");
+          showBanner(msg, "red");
         }
         setTimeout(() => {
-          hideOverlay();
+          hideBanner();
           updateStatus("waiting");
           readingPaused = false;
         }, 2000);
       }).catch(() => {
-        showOverlay(`${staffId}\n${areaName}\n通信エラー`, "red");
         updateStatus("error");
+        showBanner(`${staffId}\n${areaName}\n通信エラー`, "red");
         setTimeout(() => {
-          hideOverlay();
+          hideBanner();
           updateStatus("waiting");
           readingPaused = false;
         }, 2000);
@@ -202,8 +194,6 @@
       lastTime = now;
       readingPaused = true;
 
-      updateStatus("scanned");
-      showOverlay("処理中", "orange");
       sendLog(staffId);
     }
 
