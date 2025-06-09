@@ -6,66 +6,85 @@
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     html, body {
-      margin: 0; padding: 0; background: black; color: white; font-family: 'Noto Sans', sans-serif;
-      height: 100%; width: 100%; overflow: hidden;
+      margin: 0; padding: 0;
+      height: 100%; width: 100%;
+      background: #007b43 !important;
+      color: white;
+      font-family: 'Noto Sans', sans-serif;
+      overflow: hidden;
     }
     #header {
       display: flex; justify-content: space-between; align-items: center;
-      background: black; padding: 10px 20px; font-weight: 900; font-size: 2.25em;
+      background: #007b43; padding: 10px 20px; font-weight: 900; font-size: 2.25em;
     }
     #info {
-      background: black; padding: 0 30px 15px;
+      background: #007b43; padding: 0 30px 15px;
       display: flex; justify-content: space-between; align-items: center;
     }
     #area-name, #status { font-size: 1.8em; font-weight: bold; }
     #reader-container {
       position: relative;
       width: 100vw;
-      height: calc(100vh - 170px);  /* ヘッダ・インフォ分引いて最大化 */
+      height: calc(100vh - 170px); /* ヘッダ・インフォ分引いて最大化 */
       overflow: hidden;
       display: flex; align-items: flex-start; justify-content: center;
-      background: #181818;
+      background: #007b43;
     }
     #reader {
-      width: 100vw;
-      height: 100%;
+      width: 100vw; height: 100%;
       background: #222;
       position: relative;
-      max-width: 100vw;
-      max-height: 100%;
+      max-width: 100vw; max-height: 100%;
+      overflow: hidden;
     }
+    /* QR枠（白い正方形）を上に重ねて表示 */
+    #qrbox-overlay {
+      position: absolute;
+      border: 6px solid #fff;
+      border-radius: 18px;
+      pointer-events: none;
+      z-index: 20;
+      display: none; /* カメラ起動時に表示 */
+      box-sizing: border-box;
+      box-shadow: 0 0 24px 2px rgba(0,0,0,0.21);
+    }
+    /* バナー（中央・大きく） */
     #result-banner {
       position: fixed;
       top: 50%; left: 50%; transform: translate(-50%, -50%);
       background-color: rgba(0,0,0,0.93); color: white;
-      font-size: 2.5em; font-weight: bold;
-      padding: 48px 48px; border-radius: 18px; text-align: center; z-index: 10;
-      display: none; white-space: pre-line; min-width: 340px; min-height: 120px;
+      font-size: 2.7em; font-weight: bold;
+      padding: 56px 56px; border-radius: 22px; text-align: center; z-index: 100;
+      display: none; white-space: pre-line; min-width: 380px; min-height: 120px;
       box-shadow: 0 4px 64px 0 rgba(0,0,0,0.24);
+      letter-spacing: 1.5px;
     }
+    /* カメラ切替UI（右下固定） */
     .camera-select-wrapper {
-      position: absolute; right: 38px; bottom: 38px; z-index: 11;
+      position: fixed;
+      right: 38px; bottom: 38px; z-index: 110;
       display: flex; flex-direction: column; align-items: flex-end;
-      background: rgba(0,0,0,0.18); padding: 7px 16px; border-radius: 10px;
+      background: rgba(0,0,0,0.14); padding: 8px 18px; border-radius: 13px;
+      box-shadow: 0 2px 10px 0 rgba(0,0,0,0.15);
     }
     #camera-label {
-      color: white; font-size: 1.2em; margin-bottom: 7px;
+      color: white; font-size: 1.18em; margin-bottom: 7px;
       font-weight: bold;
     }
     #camera-select {
-      font-size: 1.3em; background: #000; color: #fff;
-      border: 2px solid #fff; border-radius: 10px; padding: 7px 10px;
-      min-width: 110px;
+      font-size: 1.15em; background: #222; color: #fff;
+      border: 2px solid #fff; border-radius: 10px; padding: 8px 13px;
+      min-width: 115px;
     }
-    @media (max-width: 800px) {
-      #reader { width: 100vw; height: 65vw; min-height: 200px;}
+    @media (max-width: 900px) {
+      #reader { width: 100vw; height: 64vw; min-height: 200px;}
+      #result-banner { font-size: 1.6em; padding: 32px 12px; min-width: 180px;}
       .camera-select-wrapper { right: 8vw; }
-      #result-banner { font-size: 1.5em; padding: 28px 10px; min-width: 180px;}
     }
-    @media (max-width: 500px) {
+    @media (max-width: 600px) {
       #reader-container { height: calc(100vh - 120px);}
-      #reader { height: 65vw;}
-      .camera-select-wrapper { right: 2vw; padding: 3px 3px;}
+      #reader { height: 64vw;}
+      .camera-select-wrapper { right: 2vw; padding: 4px 6px;}
       #camera-label { font-size: 1em;}
       #camera-select { font-size: 1em;}
     }
@@ -74,7 +93,7 @@
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.0</div>
+    <div>v1.1</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span>
@@ -82,10 +101,11 @@
   </div>
   <div id="reader-container">
     <div id="reader"></div>
-    <div class="camera-select-wrapper">
-      <label id="camera-label" for="camera-select">カメラ切替</label>
-      <select id="camera-select"></select>
-    </div>
+    <div id="qrbox-overlay"></div>
+  </div>
+  <div class="camera-select-wrapper">
+    <label id="camera-label" for="camera-select">カメラ切替</label>
+    <select id="camera-select"></select>
   </div>
   <div id="result-banner"></div>
   <script>
@@ -113,12 +133,15 @@
     const statusEl = document.getElementById("status");
     const bannerEl = document.getElementById("result-banner");
     const cameraSelect = document.getElementById("camera-select");
+    const qrboxOverlay = document.getElementById("qrbox-overlay");
+    const readerEl = document.getElementById("reader");
 
     areaEl.textContent = areaName;
 
     let html5QrCode = null;
     let currentCameraId = null;
     let scanning = false;
+    let lastQrbox = null;
 
     function updateStatus(statusType) {
       if(statusType === "ready") {
@@ -137,7 +160,7 @@
       bannerEl.innerText = message;
       bannerEl.style.display = "block";
       bannerEl.style.backgroundColor = color;
-      bannerEl.style.fontSize = "2.5em";
+      bannerEl.style.fontSize = "2.7em";
       setTimeout(() => {
         bannerEl.style.display = "none";
       }, 3000);
@@ -174,6 +197,19 @@
         });
     }
 
+    // QR枠（正方形）オーバーレイを描画
+    function setQrboxOverlay(box) {
+      if (!box) {
+        qrboxOverlay.style.display = "none";
+        return;
+      }
+      qrboxOverlay.style.left = box.x + "px";
+      qrboxOverlay.style.top = box.y + "px";
+      qrboxOverlay.style.width = box.width + "px";
+      qrboxOverlay.style.height = box.height + "px";
+      qrboxOverlay.style.display = "block";
+    }
+
     // カメラ・QR初期化
     function startCamera(cameraId) {
       if(html5QrCode) {
@@ -181,22 +217,24 @@
       }
       html5QrCode = new Html5Qrcode("reader");
       updateStatus("ready");
-      // サイズ計算：親の高さ
-      let container = document.getElementById('reader-container');
+
       html5QrCode.start(
         cameraId,
         {
           fps: 10,
+          // PCでもスマホでも「高さ基準で中央よりやや上」の正方形を出す
           qrbox: function(vw, vh) {
-            // vh: #readerの高さ
-            // 正方形サイズ＝vhの50%、最大500px
+            // 正方形サイズ=高さの50%、最大500px
             const side = Math.min(500, Math.floor(vh * 0.5));
-            // 上から20%の位置に正方形（中央より上）
+            // 上から20%の位置に正方形（中央よりやや上）
             const y = Math.floor(vh * 0.2);
             const x = Math.floor((vw - side) / 2);
-            return { width: side, height: side, x: x, y: y };
+            const box = { width: side, height: side, x: x, y: y };
+            setTimeout(() => setQrboxOverlay(box), 150); // canvas表示直後に枠を重ねる
+            lastQrbox = box;
+            return box;
           },
-          aspectRatio: 0.75, // スマホだと縦長、PCでも全高活用
+          aspectRatio: 0.75, // 高さ優先。PCでも全高活用
           experimentalFeatures: { useBarCodeDetectorIfSupported: true }
         },
         decodedText => {
@@ -213,9 +251,17 @@
         }
       ).then(() => {
         updateStatus("scanning");
+        // 万一リサイズされた時の枠も更新
+        setTimeout(() => { if (lastQrbox) setQrboxOverlay(lastQrbox); }, 500);
       }).catch(err => updateStatus("ready"));
     }
 
+    // ウィンドウリサイズ時もQR枠更新
+    window.addEventListener('resize', () => {
+      if (lastQrbox) setQrboxOverlay(lastQrbox);
+    });
+
+    // カメラ選択UI
     Html5Qrcode.getCameras().then(devices => {
       if (devices.length === 0) {
         updateStatus("ready");
