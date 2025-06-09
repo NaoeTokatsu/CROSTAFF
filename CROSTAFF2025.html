@@ -3,90 +3,117 @@
 <head>
   <meta charset="UTF-8">
   <title>CROSTAFF2025 QR Scanner</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     html, body {
-      margin: 0; padding: 0;
-      height: 100%; width: 100%;
-      background: #007b43 !important;
-      color: white;
+      margin: 0; padding: 0; height: 100%; width: 100vw;
+      background: #007b43 !important; color: #fff;
       font-family: 'Noto Sans', sans-serif;
       overflow: hidden;
     }
     #header {
       display: flex; justify-content: space-between; align-items: center;
-      background: #007b43; padding: 10px 20px; font-weight: 900; font-size: 2.25em;
+      background: #007b43; padding: 10px 20px; font-weight: 900; font-size: 2.2em;
     }
     #info {
       background: #007b43; padding: 0 30px 15px;
       display: flex; justify-content: space-between; align-items: center;
     }
-    #area-name, #status { font-size: 1.8em; font-weight: bold; }
-    #reader-container {
+    #area-name, #status { font-size: 1.4em; font-weight: bold; }
+
+    #main-section {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; width: 100vw;
+      min-height: calc(100vh - 200px);
       position: relative;
-      width: 100vw;
-      height: calc(100vh - 170px); /* ヘッダ・インフォ分引いて最大化 */
-      overflow: hidden;
-      display: flex; align-items: flex-start; justify-content: center;
       background: #007b43;
     }
+    #reader-wrap {
+      display: flex; align-items: center; justify-content: center;
+      width: 100vw; max-width: 720px; margin: 0 auto; position: relative;
+      height: 70vw; max-height: 66vh; min-height: 330px;
+    }
     #reader {
-      width: 100vw; height: 100%;
-      background: #222;
+      width: 100%; height: 100%; max-width: 560px; max-height: 480px;
+      min-width: 260px; min-height: 180px;
+      margin: 0 auto; display: block; background: #222;
+      border-radius: 18px; box-shadow: 0 4px 38px 0 rgba(0,0,0,0.14);
       position: relative;
-      max-width: 100vw; max-height: 100%;
-      overflow: hidden;
     }
-    /* QR枠（白い正方形）を上に重ねて表示 */
-    #qrbox-overlay {
-      position: absolute;
-      border: 6px solid #fff;
-      border-radius: 18px;
-      pointer-events: none;
-      z-index: 20;
-      display: none; /* カメラ起動時に表示 */
+    #qrbox-visual {
+      position: absolute; pointer-events: none; z-index: 8;
+      border: 6px solid #fff; border-radius: 16px;
       box-sizing: border-box;
-      box-shadow: 0 0 24px 2px rgba(0,0,0,0.21);
+      /* 位置・サイズはJSで中央に指定 */
     }
-    /* バナー（中央・大きく） */
+
     #result-banner {
       position: fixed;
       top: 50%; left: 50%; transform: translate(-50%, -50%);
       background-color: rgba(0,0,0,0.93); color: white;
-      font-size: 2.7em; font-weight: bold;
-      padding: 56px 56px; border-radius: 22px; text-align: center; z-index: 100;
-      display: none; white-space: pre-line; min-width: 380px; min-height: 120px;
+      font-size: 2.4em; font-weight: bold;
+      padding: 48px 48px; border-radius: 22px;
+      z-index: 100;
+      display: none;
+      min-width: 320px; min-height: 120px;
       box-shadow: 0 4px 64px 0 rgba(0,0,0,0.24);
       letter-spacing: 1.5px;
+      text-align: center;       /* 中央揃え */
+      white-space: pre-line;    /* 改行あり */
     }
-    /* カメラ切替UI（右下固定） */
-    .camera-select-wrapper {
+    /* フッター（スマホ・PC共通で常に下端） */
+    #footer {
+      background: #007b43;
+      width: 100vw;
+      min-height: 60px;
       position: fixed;
-      right: 38px; bottom: 38px; z-index: 110;
-      display: flex; flex-direction: column; align-items: flex-end;
-      background: rgba(0,0,0,0.14); padding: 8px 18px; border-radius: 13px;
-      box-shadow: 0 2px 10px 0 rgba(0,0,0,0.15);
+      bottom: 0; left: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      z-index: 150;
+      border-top: 1px solid #0a5730;
+    }
+    .camera-select-footer {
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+      width: 100vw; padding: 0 0 10px 0;
     }
     #camera-label {
-      color: white; font-size: 1.18em; margin-bottom: 7px;
+      font-size: 1.15em;
+      color: #fff;
       font-weight: bold;
+      margin-bottom: 9px;
+      margin-top: 4px;
+      text-align: center;
     }
     #camera-select {
-      font-size: 1.15em; background: #222; color: #fff;
-      border: 2px solid #fff; border-radius: 10px; padding: 8px 13px;
-      min-width: 115px;
+      font-size: 1.45em;
+      padding: 13px 28px;
+      border-radius: 13px;
+      border: 2px solid #fff;
+      background: #222;
+      color: #fff;
+      font-weight: bold;
+      margin-bottom: 7px;
+      min-width: 140px;
+      text-align: center;
     }
-    @media (max-width: 900px) {
-      #reader { width: 100vw; height: 64vw; min-height: 200px;}
-      #result-banner { font-size: 1.6em; padding: 32px 12px; min-width: 180px;}
-      .camera-select-wrapper { right: 8vw; }
+
+    /* PC用のカメラ切替は右下にも表示 */
+    @media (min-width: 700px) {
+      .camera-select-pc {
+        position: fixed; right: 38px; bottom: 78px; z-index: 155;
+        display: flex; flex-direction: column; align-items: center;
+      }
+      #footer { min-height: 40px; }
+      #camera-select { font-size: 1.22em; padding: 10px 22px; }
     }
-    @media (max-width: 600px) {
-      #reader-container { height: calc(100vh - 120px);}
-      #reader { height: 64vw;}
-      .camera-select-wrapper { right: 2vw; padding: 4px 6px;}
-      #camera-label { font-size: 1em;}
-      #camera-select { font-size: 1em;}
+    @media (max-width: 700px) {
+      #main-section, #reader-wrap { height: 48vw; min-height: 210px;}
+      #result-banner { font-size: 1.25em; padding: 18px 6px; min-width: 140px;}
+      #footer { min-height: 60px; }
+      #camera-select { font-size: 1.1em; padding: 8px 13px;}
     }
   </style>
 </head>
@@ -99,13 +126,23 @@
     <span id="area-name">エリア名取得中...</span>
     <span id="status">カメラ準備中...</span>
   </div>
-  <div id="reader-container">
-    <div id="reader"></div>
-    <div id="qrbox-overlay"></div>
+  <div id="main-section">
+    <div id="reader-wrap">
+      <div id="reader"></div>
+      <div id="qrbox-visual"></div>
+    </div>
   </div>
-  <div class="camera-select-wrapper">
-    <label id="camera-label" for="camera-select">カメラ切替</label>
-    <select id="camera-select"></select>
+  <!-- フッター（スマホ/PC共通） -->
+  <div id="footer">
+    <div class="camera-select-footer">
+      <div id="camera-label">カメラ切替</div>
+      <select id="camera-select"></select>
+    </div>
+  </div>
+  <!-- PC用に右下にもカメラ切替表示 -->
+  <div class="camera-select-pc" style="display: none;">
+    <div id="camera-label-pc">カメラ切替</div>
+    <select id="camera-select-pc"></select>
   </div>
   <div id="result-banner"></div>
   <script>
@@ -133,9 +170,10 @@
     const statusEl = document.getElementById("status");
     const bannerEl = document.getElementById("result-banner");
     const cameraSelect = document.getElementById("camera-select");
-    const qrboxOverlay = document.getElementById("qrbox-overlay");
-    const readerEl = document.getElementById("reader");
-
+    const cameraLabel = document.getElementById("camera-label");
+    const cameraSelectPC = document.getElementById("camera-select-pc");
+    const cameraLabelPC = document.getElementById("camera-label-pc");
+    const qrboxVisual = document.getElementById("qrbox-visual");
     areaEl.textContent = areaName;
 
     let html5QrCode = null;
@@ -143,6 +181,7 @@
     let scanning = false;
     let lastQrbox = null;
 
+    // ステータス表示
     function updateStatus(statusType) {
       if(statusType === "ready") {
         statusEl.textContent = "カメラ準備中";
@@ -156,16 +195,18 @@
       }
     }
 
+    // バナー表示（中央・大きく・中央揃え・3秒）
     function showBanner(message, color) {
       bannerEl.innerText = message;
       bannerEl.style.display = "block";
       bannerEl.style.backgroundColor = color;
-      bannerEl.style.fontSize = "2.7em";
+      bannerEl.style.textAlign = "center";
       setTimeout(() => {
         bannerEl.style.display = "none";
       }, 3000);
     }
 
+    // サーバー送信とバナー
     function sendLog(staffId) {
       scanning = true;
       updateStatus("processing");
@@ -177,37 +218,39 @@
           updateStatus("scanning");
           const [status, area3, staff] = result.trim().split(",");
           let areaFullName = areaNames[area3] || "未設定";
-          let message, bannerColor;
+          let action, bannerColor, message;
           if (status === "1") {
-            message = `記録成功\n${staff} ${areaFullName} 入室`;
+            action = "入室";
             bannerColor = "limegreen";
+            message = `記録成功\n${action}\n${staff}\n${areaFullName}`;
           } else if (status === "2") {
-            message = `記録成功\n${staff} ${areaFullName} 退室`;
+            action = "退室";
             bannerColor = "skyblue";
+            message = `記録成功\n${action}\n${staff}\n${areaFullName}`;
           } else {
-            message = `記録失敗\n${staff} ${areaFullName}`;
             bannerColor = "red";
+            message = `記録失敗\n${staff}\n${areaFullName}`;
           }
           showBanner(message, bannerColor);
         })
         .catch(() => {
           scanning = false;
           updateStatus("scanning");
-          showBanner("記録失敗\n通信エラー", "red");
+          showBanner("記録失敗", "red");
         });
     }
 
-    // QR枠（正方形）オーバーレイを描画
-    function setQrboxOverlay(box) {
+    // QRボックス（中央正方形のみ・1つだけ）
+    function setQrboxVisual(box) {
       if (!box) {
-        qrboxOverlay.style.display = "none";
+        qrboxVisual.style.display = "none";
         return;
       }
-      qrboxOverlay.style.left = box.x + "px";
-      qrboxOverlay.style.top = box.y + "px";
-      qrboxOverlay.style.width = box.width + "px";
-      qrboxOverlay.style.height = box.height + "px";
-      qrboxOverlay.style.display = "block";
+      qrboxVisual.style.left = box.x + "px";
+      qrboxVisual.style.top = box.y + "px";
+      qrboxVisual.style.width = box.width + "px";
+      qrboxVisual.style.height = box.height + "px";
+      qrboxVisual.style.display = "block";
     }
 
     // カメラ・QR初期化
@@ -217,24 +260,22 @@
       }
       html5QrCode = new Html5Qrcode("reader");
       updateStatus("ready");
-
       html5QrCode.start(
         cameraId,
         {
           fps: 10,
-          // PCでもスマホでも「高さ基準で中央よりやや上」の正方形を出す
           qrbox: function(vw, vh) {
-            // 正方形サイズ=高さの50%、最大500px
-            const side = Math.min(500, Math.floor(vh * 0.5));
-            // 上から20%の位置に正方形（中央よりやや上）
-            const y = Math.floor(vh * 0.2);
-            const x = Math.floor((vw - side) / 2);
-            const box = { width: side, height: side, x: x, y: y };
-            setTimeout(() => setQrboxOverlay(box), 150); // canvas表示直後に枠を重ねる
+            // QR枠：正方形を中央（上下左右）に配置
+            const side = Math.min(420, vw, vh) * 0.75;
+            const width = side, height = side;
+            const x = Math.floor((vw - width) / 2);
+            const y = Math.floor((vh - height) / 2);
+            const box = { width, height, x, y };
+            setTimeout(() => setQrboxVisual(box), 180); // 表示を合わせる
             lastQrbox = box;
             return box;
           },
-          aspectRatio: 0.75, // 高さ優先。PCでも全高活用
+          aspectRatio: 1.0, // 正方形canvas
           experimentalFeatures: { useBarCodeDetectorIfSupported: true }
         },
         decodedText => {
@@ -251,17 +292,32 @@
         }
       ).then(() => {
         updateStatus("scanning");
-        // 万一リサイズされた時の枠も更新
-        setTimeout(() => { if (lastQrbox) setQrboxOverlay(lastQrbox); }, 500);
+        setTimeout(() => { if (lastQrbox) setQrboxVisual(lastQrbox); }, 600);
       }).catch(err => updateStatus("ready"));
     }
 
-    // ウィンドウリサイズ時もQR枠更新
+    // リサイズ時にもQRボックス更新
     window.addEventListener('resize', () => {
-      if (lastQrbox) setQrboxOverlay(lastQrbox);
+      if (lastQrbox) setQrboxVisual(lastQrbox);
     });
 
-    // カメラ選択UI
+    // カメラ選択UI（スマホ/フッター & PC/右下の両方に反映）
+    function syncCameraSelects(devices) {
+      [cameraSelect, cameraSelectPC].forEach(select => {
+        select.innerHTML = "";
+        devices.forEach((device, index) => {
+          const option = document.createElement("option");
+          option.value = device.id;
+          option.text = device.label || `カメラ ${index + 1}`;
+          select.appendChild(option);
+        });
+      });
+    }
+
+    function showPCSelect(show) {
+      document.querySelector('.camera-select-pc').style.display = show ? "flex" : "none";
+    }
+
     Html5Qrcode.getCameras().then(devices => {
       if (devices.length === 0) {
         updateStatus("ready");
@@ -269,21 +325,30 @@
         statusEl.style.color = "red";
         return;
       }
-      devices.forEach((device, index) => {
-        const option = document.createElement("option");
-        option.value = device.id;
-        option.text = device.label || `カメラ ${index + 1}`;
-        cameraSelect.appendChild(option);
-      });
+      syncCameraSelects(devices);
       const defaultCamera = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
       currentCameraId = defaultCamera.id;
       cameraSelect.value = currentCameraId;
-      startCamera(currentCameraId);
+      cameraSelectPC.value = currentCameraId;
 
-      cameraSelect.addEventListener("change", e => {
-        const newCameraId = e.target.value;
-        startCamera(newCameraId);
+      // PCでは右下にもカメラ切替表示
+      if (window.innerWidth > 700) {
+        showPCSelect(true);
+      }
+      window.addEventListener('resize', () => {
+        showPCSelect(window.innerWidth > 700);
       });
+
+      // カメラ切替イベント（両方のセレクトに同期）
+      function handleCameraChange(newCameraId) {
+        cameraSelect.value = newCameraId;
+        cameraSelectPC.value = newCameraId;
+        startCamera(newCameraId);
+      }
+      cameraSelect.addEventListener("change", e => handleCameraChange(e.target.value));
+      cameraSelectPC.addEventListener("change", e => handleCameraChange(e.target.value));
+
+      startCamera(currentCameraId);
     }).catch(err => {
       updateStatus("ready");
       statusEl.textContent = `カメラ取得失敗: ${err}`;
