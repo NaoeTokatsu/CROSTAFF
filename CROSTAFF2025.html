@@ -107,7 +107,6 @@
       align-items: center;
       justify-content: flex-start;
       z-index: 12;
-      box-shadow: 0 -4px 14px -7px rgba(0,0,0,0.24);
       padding-top: 9px;
       padding-bottom: 18px;
     }
@@ -271,15 +270,15 @@
           await html5QrCode.clear().catch(() => {});
         }
       } catch (e) {
-        console.warn("既存のQRコード停止処理でエラー:", e);
+        console.warn("カメラ停止エラー:", e);
       }
 
       html5QrCode = new Html5Qrcode("reader");
 
       try {
         await html5QrCode.start(
-          cameraId,
-          { fps: 10 },
+          { deviceId: { exact: cameraId } },
+          { fps: 10, facingMode: "environment" },
           decodedText => {
             if (!scanning) return;
             if (!decodedText.startsWith("cs25-")) {
