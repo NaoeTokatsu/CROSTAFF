@@ -18,44 +18,69 @@
       display: flex; justify-content: space-between; align-items: center;
     }
     #area-name, #status { font-size: 1.8em; font-weight: bold; }
-    #reader-container { position: relative; width: 100vw; height: calc(100vh - 160px);}
-    #reader { width: 100%; height: 100%; position: relative;}
+    #reader-container {
+      /* 上寄せ&中央揃え */
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      width: 100vw; height: calc(100vh - 170px);
+      position: relative;
+    }
+    #reader {
+      /* やや上にマージン（映像・QR枠ごと） */
+      margin-top: 40px;
+      width: 600px; height: 480px;
+      max-width: 95vw; max-height: 70vh;
+      background: #222;
+      position: relative;
+      box-shadow: 0 4px 32px 0 rgba(0,0,0,0.18);
+      border-radius: 18px;
+    }
     #result-banner {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      position: absolute; top: 52%; left: 50%; transform: translate(-50%, -50%);
       background-color: rgba(0, 0, 0, 0.85); color: white; font-size: 2em; font-weight: bold;
       padding: 20px; border-radius: 12px; text-align: center; z-index: 5;
       display: none; white-space: pre-line;
+      min-width: 250px;
     }
-    #camera-select {
-      position: absolute; bottom: 20px; right: 20px; z-index: 6; font-size: 2em;
-      background-color: black; color: white; border: 2px solid white; padding: 10px; border-radius: 10px;
+    /* カメラ切替UIを下端・ラベルが上 */
+    .camera-select-wrapper {
+      position: absolute; bottom: 30px; right: 30px; z-index: 6;
+      display: flex; flex-direction: column; align-items: flex-end;
     }
     #camera-label {
-      position: absolute; bottom: 70px; right: 20px; z-index: 6; color: white; font-size: 1.5em;
-      /* 上にずらす */
-      margin-bottom: 0;
+      color: white; font-size: 1.3em; margin-bottom: 5px;
+      background: rgba(0,0,0,0.4); padding: 2px 8px; border-radius: 8px;
+    }
+    #camera-select {
+      font-size: 1.5em; background-color: black; color: white;
+      border: 2px solid white; padding: 7px 10px; border-radius: 10px;
+    }
+    @media (max-width: 900px) {
+      #reader { width: 96vw; height: 65vw; min-height: 250px; }
+      .camera-select-wrapper { right: 7vw; }
     }
     @media (max-width: 600px) {
-      #camera-label, #camera-select { font-size: 1.1em; padding: 6px; }
-      #camera-label { bottom: 95px; }
-      #camera-select { bottom: 40px; }
+      #reader { width: 98vw; height: 55vw; min-height: 200px; }
+      #camera-label, #camera-select { font-size: 1.0em; padding: 5px; }
+      .camera-select-wrapper { right: 3vw; }
     }
   </style>
 </head>
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.0.0</div>
+    <div>v1.1</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span>
     <span id="status">カメラ準備中...</span>
   </div>
-  <label id="camera-label" for="camera-select">カメラ切替:</label>
-  <select id="camera-select"></select>
   <div id="reader-container">
     <div id="reader"></div>
     <div id="result-banner"></div>
+    <div class="camera-select-wrapper">
+      <label id="camera-label" for="camera-select">カメラ切替</label>
+      <select id="camera-select"></select>
+    </div>
   </div>
   <script>
     // 3レター→正式名称
@@ -89,12 +114,10 @@
 
     let html5QrCode = null;
     let currentCameraId = null;
-    let lastScan = "";
-    let lastTime = 0;
-    let scanning = false; // 現在スキャン処理中かどうか
+    let scanning = false; // サーバー応答待ちかどうか
 
+    // ステータス表示
     function updateStatus(statusType) {
-      // "ready"|"scanning"|"processing"
       if(statusType === "ready") {
         statusEl.textContent = "カメラ準備中";
         statusEl.style.color = "gray";
@@ -107,59 +130,52 @@
       }
     }
 
-    function showBanner(message, color, callback) {
+    // バナー表示（スキャンはステータス切替時点で即再開）
+    function showBanner(message, color) {
       bannerEl.innerText = message;
       bannerEl.style.display = "block";
       bannerEl.style.backgroundColor = color;
       setTimeout(() => {
         bannerEl.style.display = "none";
-        if (callback) callback();
       }, 2000);
     }
 
+    // サーバー送信とバナー・ステータス即時切替
     function sendLog(staffId) {
-      scanning = true; // スキャン一時停止
+      scanning = true; // サーバー処理中
       updateStatus("processing");
       const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
       fetch(url)
         .then(r => r.text())
         .then(result => {
+          scanning = false; // 返答来た瞬間に即スキャン可
+          updateStatus("scanning");
           const [status, area3, staff] = result.trim().split(",");
           let areaFullName = areaNames[area3] || "未設定";
           let message, bannerColor;
           if (status === "1") {
             message = `記録成功\n${staff} ${areaFullName} 入室`;
             bannerColor = "limegreen";
-            showBanner(message, bannerColor, () => {
-              scanning = false; // スキャン再開
-              updateStatus("scanning");
-            });
           } else if (status === "2") {
             message = `記録成功\n${staff} ${areaFullName} 退室`;
             bannerColor = "skyblue";
-            showBanner(message, bannerColor, () => {
-              scanning = false;
-              updateStatus("scanning");
-            });
           } else {
             message = `記録失敗\n${staff} ${areaFullName}`;
-            showBanner(message, "red", () => {
-              scanning = false;
-              updateStatus("scanning");
-            });
+            bannerColor = "red";
           }
+          showBanner(message, bannerColor);
         })
         .catch(() => {
-          showBanner("記録失敗\n通信エラー", "red", () => {
-            scanning = false;
-            updateStatus("scanning");
-          });
+          scanning = false;
+          updateStatus("scanning");
+          showBanner("記録失敗\n通信エラー", "red");
         });
     }
 
+    // カメラ・QR初期化
     function startCamera(cameraId) {
       if(html5QrCode) {
-        html5QrCode.stop().catch(()=>{}); // 保険：多重起動防止
+        html5QrCode.stop().catch(()=>{});
       }
       html5QrCode = new Html5Qrcode("reader");
       updateStatus("ready");
@@ -167,32 +183,31 @@
         cameraId,
         {
           fps: 10,
+          // 正方形かつ中央よりやや上寄せで枠を出す
           qrbox: (vw, vh) => {
-            // 上端から300pxの位置に、最大500px四方の枠。ただし画面が小さい場合は縮小
-            const desiredTop = 300;
-            const boxSize = 500;
-            // vh: #readerの高さ
-            const availHeight = Math.max(vh - desiredTop, 100);
-            const finalBox = Math.min(boxSize, availHeight, vw - 40); // 横もはみ出さないよう40pxマージン
+            // カメラ映像領域の幅vw高さvhで最大正方形
+            const marginTop = 30; // やや上寄せ
+            const maxSize = Math.min(500, vw * 0.92, vh - marginTop);
+            const side = Math.max(180, maxSize); // 小さすぎる場合180px
+            // 中央より上になるようyをmarginTop
             return {
-              width: finalBox,
-              height: finalBox,
-              x: (vw - finalBox) / 2,
-              y: desiredTop
+              width: side,
+              height: side,
+              x: (vw - side) / 2,
+              y: marginTop
             };
           },
-          aspectRatio: 1.0,
+          aspectRatio: 1.25, // 横:縦
           experimentalFeatures: { useBarCodeDetectorIfSupported: true }
         },
         decodedText => {
-          // すでにスキャン中の場合は受付しない
-          if (scanning) return;
+          if (scanning) return; // サーバー応答待ち中は読み込まない
           if (!decodedText.startsWith("cs25-")) {
             updateStatus("scanning");
-            return; // 無効なコードはスルーし、すぐスキャン再開
+            return; // 無効なコードは即スキャン再開
           }
           const staffId = decodedText.slice(5);
-          sendLog(staffId); // サーバー応答待ちの間はスキャン受付しない
+          sendLog(staffId);
         },
         () => {
           if(!scanning) updateStatus("scanning");
@@ -202,6 +217,7 @@
       }).catch(err => updateStatus("ready"));
     }
 
+    // カメラ選択UI
     Html5Qrcode.getCameras().then(devices => {
       if (devices.length === 0) {
         updateStatus("ready");
