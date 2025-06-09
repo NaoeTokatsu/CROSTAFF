@@ -2,173 +2,69 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>CROSTAFF2025 QR Scanner</title>
+  <title>QRコードテスト</title>
   <script src="https://unpkg.com/html5-qrcode@2.3.9" type="text/javascript"></script>
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      background: black;
-      color: white;
-      font-family: 'Noto Sans', sans-serif;
       height: 100%;
-      overflow: hidden;
-    }
-    #header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: black;
-      padding: 10px 20px;
-      font-weight: 900;
-      font-size: 1.5em;
-    }
-    #info {
-      background: black;
-      padding: 0 20px 10px;
-      font-size: 1em;
-    }
-    #reader-container {
-      position: relative;
-      width: 100vw;
-      height: calc(100vh - 160px);
+      background-color: black;
+      color: white;
+      font-family: sans-serif;
     }
     #reader {
       width: 100%;
-      height: 100%;
-      object-fit: cover;
+      max-width: 500px;
+      margin: 50px auto;
+      border: 2px solid white;
     }
-    #qrbox-frame {
-      position: absolute;
-      width: 60vmin;
-      height: 60vmin;
-      border: 3px dashed rgba(255,255,255,0.9);
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 3;
-      pointer-events: none;
-    }
-    #mask {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0,0,0,0.6);
-      clip-path: polygon(
-        0% 0%, 100% 0%, 100% 100%, 0% 100%,
-        0% 0%,
-        calc(50% - 30vmin) calc(50% - 30vmin),
-        calc(50% + 30vmin) calc(50% - 30vmin),
-        calc(50% + 30vmin) calc(50% + 30vmin),
-        calc(50% - 30vmin) calc(50% + 30vmin),
-        calc(50% - 30vmin) calc(50% - 30vmin)
-      );
-      z-index: 2;
-      pointer-events: none;
-    }
-    #result-banner {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background-color: rgba(0, 0, 0, 0.85);
-      color: white;
-      font-size: 1.6em;
-      padding: 20px;
-      border-radius: 12px;
+    #status {
       text-align: center;
-      z-index: 5;
-      display: none;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <div id="header">
-    <div>CROSTAFF</div>
-    <div>v1.3.2</div>
-  </div>
-  <div id="info">
-    <span id="area-name">エリア名取得中...</span> ｜
-    <span id="status">カメラ初期化中...</span>
-  </div>
-  <div id="reader-container">
-    <div id="reader"></div>
-    <div id="mask"></div>
-    <div id="qrbox-frame"></div>
-    <div id="result-banner"></div>
-  </div>
+
+  <div id="reader"></div>
+  <div id="status">カメラ初期化中...</div>
 
   <script>
-    const areaMap = {
-      "バックステージ": "OBS",
-      "小講堂": "OSA",
-      "男子更衣室": "MCR",
-      "女子更衣室": "WCR"
-    };
-    const params = new URLSearchParams(location.search);
-    const areaName = params.get("area") || "未設定";
-    const areaCode = areaMap[areaName] || "UNK";
-    const endpoint = "https://script.google.com/macros/s/AKfycbx85vMW0Rh9zTRqnLfyr4zAjZ-WWVIIB-8CBC46elZfe_cJyCbewoQfRuf0n5nWj5r1/exec";
-
-    const areaEl = document.getElementById("area-name");
     const statusEl = document.getElementById("status");
-    const bannerEl = document.getElementById("result-banner");
+    const html5QrCode = new Html5Qrcode("reader");
 
-    areaEl.textContent = areaName;
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices && devices.length > 0) {
+        const cameraId = devices[0].id;
 
-    let html5QrCode = null;
-    let lastScan = "";
-    let lastTime = 0;
-
-    function showBanner(message) {
-      bannerEl.innerText = message;
-      bannerEl.style.display = "block";
-      setTimeout(() => bannerEl.style.display = "none", 2000);
-    }
-
-    function sendLog(staffId) {
-      const now = Date.now();
-      if (staffId === lastScan && now - lastTime < 3000) return;
-      lastScan = staffId;
-      lastTime = now;
-      const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
-      statusEl.innerText = "送信中...";
-      fetch(url).then(r => r.text()).then(result => {
-        let msg = `${staffId}\n${areaName}\n`;
-        if (result.includes("IN")) msg += "入室処理完了";
-        else if (result.includes("OUT")) msg += "退室処理完了";
-        else msg += `エラー: ${result}`;
-        showBanner(msg);
-        statusEl.innerText = "読み取り中";
-      }).catch(() => {
-        showBanner(`${staffId}\n${areaName}\n通信エラー`);
-        statusEl.innerText = "通信エラー";
-      });
-    }
-
-    function runScanner() {
-      html5QrCode = new Html5Qrcode("reader");
-      html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        decodedText => {
-          if (!decodedText.startsWith("cs25=")) {
-            statusEl.innerText = "無効なコード";
-            return;
+        html5QrCode.start(
+          cameraId,
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 }
+          },
+          (decodedText) => {
+            console.log("読み取り成功:", decodedText);
+            statusEl.innerText = "読み取り成功: " + decodedText;
+          },
+          (errorMessage) => {
+            console.warn("読み取りエラー:", errorMessage);
           }
-          const staffId = decodedText.split("=")[1];
-          sendLog(staffId);
-        },
-        () => {
-          statusEl.innerText = "読み取り中";
-        }
-      ).catch(err => {
-        statusEl.innerText = "カメラ起動失敗: " + err;
-      });
-    }
-
-    // 初期起動
-    runScanner();
+        ).then(() => {
+          statusEl.innerText = "カメラ起動成功・読み取り中";
+        }).catch(err => {
+          console.error("開始エラー:", err);
+          statusEl.innerText = "カメラ開始エラー: " + err;
+        });
+      } else {
+        statusEl.innerText = "利用可能なカメラが見つかりません";
+      }
+    }).catch(err => {
+      console.error("カメラ取得エラー:", err);
+      statusEl.innerText = "カメラ取得エラー: " + err;
+    });
   </script>
+
 </body>
 </html>
