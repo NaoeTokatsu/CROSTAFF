@@ -55,10 +55,20 @@
       width: 100%;
       height: 100%;
       background-color: rgba(0,0,0,0.6);
-      mask: radial-gradient(circle at center, transparent 30vw, rgba(0,0,0,0.6) 30.1vw);
-      -webkit-mask: radial-gradient(circle at center, transparent 30vw, rgba(0,0,0,0.6) 30.1vw);
       z-index: 2;
       pointer-events: none;
+    }
+    #mask::before {
+      content: "";
+      position: absolute;
+      top: 20%;
+      left: 50%;
+      width: 60vw;
+      height: 60vw;
+      transform: translate(-50%, 0);
+      background-color: transparent;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.6);
+      border-radius: 0;
     }
     #result-banner {
       position: absolute;
@@ -86,7 +96,7 @@
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.0.4</div>
+    <div>v1.0.6</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜ 
@@ -130,23 +140,24 @@
       setTimeout(() => bannerEl.style.display = "none", 2000);
     }
 
-    function sendLog(staffId) {
+    function sendLog(staffId, groupCode) {
       const now = Date.now();
-      if (staffId === lastScan && now - lastTime < 3000) return;
-      lastScan = staffId;
+      const uniqueScan = `${groupCode}-${staffId}`;
+      if (uniqueScan === lastScan && now - lastTime < 3000) return;
+      lastScan = uniqueScan;
       lastTime = now;
 
-      const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
+      const url = `${endpoint}?staff=${staffId}&group=${groupCode}&area=${areaCode}`;
       statusEl.innerText = "送信中...";
       fetch(url).then(r => r.text()).then(result => {
-        let msg = `${staffId}\n${areaName}\n`;
+        let msg = `${groupCode}-${staffId}\n${areaName}\n`;
         if (result.includes("IN")) msg += "入室処理完了";
         else if (result.includes("OUT")) msg += "退室処理完了";
         else msg += `エラー: ${result}`;
         showBanner(msg);
         statusEl.innerText = "読み取り中";
       }).catch(() => {
-        showBanner(`${staffId}\n${areaName}\n通信エラー`);
+        showBanner(`${groupCode}-${staffId}\n${areaName}\n通信エラー`);
         statusEl.innerText = "通信エラー";
       });
     }
@@ -156,17 +167,14 @@
         cameraId,
         { fps: 10, qrbox: { width: 0.6 * window.innerWidth, height: 0.6 * window.innerWidth } },
         decodedText => {
-          if (!decodedText.startsWith("cs25-")) {
+          const match = decodedText.match(/^cs25-([a-z]{3})(\d{4})$/);
+          if (!match) {
             statusEl.innerText = "無効なコード";
             return;
           }
-          const parts = decodedText.split("-");
-          if (parts.length !== 3) {
-            statusEl.innerText = "形式エラー";
-            return;
-          }
-          const staffId = parts[2]; // 4桁ID部分のみ送信
-          sendLog(staffId);
+          const groupCode = match[1];
+          const staffId = match[2];
+          sendLog(staffId, groupCode);
         },
         () => {
           statusEl.innerText = "読み取り中";
