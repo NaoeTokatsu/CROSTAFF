@@ -23,17 +23,20 @@
       font-size: 1.8em;
     }
     #area-info {
+      background-color: black;
+      color: white;
+      padding: 5px 20px;
       font-size: 1.2em;
     }
     #camera-select {
-      margin-top: 10px;
+      margin: 10px 20px;
       font-size: 1em;
       padding: 5px;
     }
     #reader {
       position: relative;
       width: 100vw;
-      height: calc(100vh - 150px);
+      height: calc(100vh - 180px);
       overflow: hidden;
     }
     #qrbox-frame {
@@ -68,7 +71,6 @@
       font-size: 0.6em;
       color: gray;
       text-align: right;
-      padding-right: 10px;
     }
   </style>
 </head>
@@ -78,10 +80,10 @@
     <div id="version">v1.1.2</div>
   </div>
   <div id="area-info">
-    <span id="area-name">エリア名取得中...</span>｜
-    <span id="status">カメラ起動中...</span><br>
-    <select id="camera-select"></select>
+    <span id="area-name">エリア名取得中...</span> ｜
+    <span id="status">カメラ起動中...</span>
   </div>
+  <select id="camera-select"></select>
   <div id="reader">
     <div id="mask"></div>
     <div id="qrbox-frame"></div>
@@ -157,7 +159,8 @@
           cameraId,
           {
             fps: 10,
-            qrbox: setQrBox
+            qrbox: setQrBox,
+            videoConstraints: { facingMode: "environment" }
           },
           (text) => {
             if (!text.startsWith("cs25=")) {
