@@ -21,12 +21,12 @@
       background: black;
       padding: 10px 20px;
       font-weight: 900;
-      font-size: 1.5em;
+      font-size: 2em;
     }
     #info {
       background: black;
       padding: 0 20px 10px;
-      font-size: 1em;
+      font-size: 1.6em;
     }
     #reader-container {
       position: relative;
@@ -41,12 +41,12 @@
     }
     #qrbox-frame {
       position: absolute;
-      width: 250px;
-      height: 250px;
+      width: 60vw;
+      height: 60vw;
       border: 3px dashed rgba(255,255,255,0.9);
-      top: 50%;
+      top: 20%;
       left: 50%;
-      transform: translate(-50%, -50%);
+      transform: translate(-50%, 0);
       z-index: 2;
       pointer-events: none;
     }
@@ -58,11 +58,11 @@
       clip-path: polygon(
         0% 0%, 100% 0%, 100% 100%, 0% 100%,
         0% 0%,
-        calc(50% - 125px) calc(50% - 125px),
-        calc(50% + 125px) calc(50% - 125px),
-        calc(50% + 125px) calc(50% + 125px),
-        calc(50% - 125px) calc(50% + 125px),
-        calc(50% - 125px) calc(50% - 125px)
+        calc(50% - 30vw) 20%,
+        calc(50% + 30vw) 20%,
+        calc(50% + 30vw) calc(20% + 60vw),
+        calc(50% - 30vw) calc(20% + 60vw),
+        calc(50% - 30vw) 20%
       );
       z-index: 1;
       pointer-events: none;
@@ -86,14 +86,14 @@
       top: 120px;
       left: 20px;
       z-index: 6;
-      font-size: 1em;
+      font-size: 1.6em;
     }
   </style>
 </head>
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.0.1</div>
+    <div>v1.0.2</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜ 
@@ -161,7 +161,7 @@
     function startCamera(cameraId) {
       html5QrCode.start(
         cameraId,
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        { fps: 10, qrbox: { width: 0.6 * window.innerWidth, height: 0.6 * window.innerWidth } },
         decodedText => {
           if (!decodedText.startsWith("cs25=")) {
             statusEl.innerText = "無効なコード";
