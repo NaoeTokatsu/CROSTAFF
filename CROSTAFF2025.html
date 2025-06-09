@@ -106,6 +106,14 @@
       "女子更衣室": "wcr"
     };
 
+    const reverseAreaMap = {
+      "obs": "バックステージ",
+      "osa": "小講堂",
+      "mcr": "男子更衣室",
+      "wcr": "女子更衣室",
+      "unk": "未設定"
+    };
+
     const params = new URLSearchParams(location.search);
     const areaName = params.get("area") || "未設定";
     const areaCode = areaMap[areaName] || "unk";
@@ -148,22 +156,24 @@
 
       const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
       fetch(url).then(r => r.text()).then(result => {
-        let action = "";
-        if (result === "1") action = "入室";
-        else if (result === "2") action = "退室";
+        const readableArea = reverseAreaMap[areaCode] || areaCode;
+        let msg = "";
 
-        if (action) {
-          const msg = `処理成功：${staffId}：${areaName}：${action}`;
+        if (result === "1") {
+          msg = `記録成功：${staffId}：${readableArea}：入室`;
           showBanner(msg, "limegreen", () => updateStatus("スキャン中", "white"));
-        } else if (result === "OK" || result === "SUCCESS") {
-          const msg = `処理成功：${staffId}：${areaName}：記録成功`;
+        } else if (result === "2") {
+          msg = `記録成功：${staffId}：${readableArea}：退室`;
+          showBanner(msg, "skyblue", () => updateStatus("スキャン中", "white"));
+        } else if (["OK", "SUCCESS", "記録成功"].includes(result)) {
+          msg = `記録成功：${staffId}：${readableArea}`;
           showBanner(msg, "limegreen", () => updateStatus("スキャン中", "white"));
         } else {
-          const msg = `処理失敗：${result}`;
-          showBanner(msg, "red", () => updateStatus("処理失敗", "red"));
+          msg = `記録失敗：${result}`;
+          showBanner(msg, "red", () => updateStatus("記録失敗", "red"));
         }
       }).catch(() => {
-        const msg = `処理失敗：通信エラー`;
+        const msg = `記録失敗：通信エラー`;
         showBanner(msg, "red", () => updateStatus("通信エラー", "red"));
       });
     }
@@ -173,16 +183,23 @@
         cameraId,
         {
           fps: 10,
-          qrbox: { width: 300, height: 300 },
+          qrbox: (w, h) => {
+            return {
+              width: 600,
+              height: 600,
+              x: (w - 600) / 2,
+              y: 300
+            };
+          },
           aspectRatio: 1.0,
-          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true }
         },
         decodedText => {
           if (!decodedText.startsWith("cs25-")) {
             updateStatus("無効なコード", "orange");
             return;
           }
-          const staffId = decodedText.slice(5);
+          const staffId = decodedText.slice(5); // 「cs25-aaa1234」→「aaa1234」
           sendLog(staffId);
         },
         () => updateStatus("スキャン中", "white")
