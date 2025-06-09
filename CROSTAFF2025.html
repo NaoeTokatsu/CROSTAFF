@@ -65,7 +65,7 @@
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.2.0</div>
+    <div>v1.3.1</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜ 
@@ -121,8 +121,8 @@
       const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
       fetch(url).then(r => r.text()).then(result => {
         let msg = `${staffId}\n${areaName}\n`;
-        if (result === "IN") msg += "入室処理完了";
-        else if (result === "OUT") msg += "退室処理完了";
+        if (result === "1") msg += "入室処理完了";
+        else if (result === "2") msg += "退室処理完了";
         else msg += `エラー: ${result}`;
         showBanner(msg);
       }).catch(() => {
@@ -152,7 +152,7 @@
 
       html5QrCode.start(
         cameraId,
-        { fps: 10, qrbox: { width: 350, height: 350 } },
+        { fps: 10 }, // 使用可能な最大範囲
         decodeQR,
         () => {
           statusEl.innerText = "読み取り中";
