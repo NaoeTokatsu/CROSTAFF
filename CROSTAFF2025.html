@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>CROSTAFF QR Scanner</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: black;
+      font-family: 'Noto Sans', sans-serif;
+    }
+    #header {
+      background-color: black;
+      color: white;
+      padding: 10px 20px;
+      font-weight: 900;
+      font-size: 1.8em;
+    }
+    #area-name, #status {
+      font-size: 1.2em;
+      margin-top: 4px;
+    }
+    #reader {
+      position: relative;
+      width: 100vw;
+      height: calc(100vh - 100px);
+      overflow: hidden;
+    }
+    #camera-feed {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #qrbox-frame {
+      position: absolute;
+      border: 3px dashed rgba(255, 255, 255, 0.8);
+      z-index: 2;
+      pointer-events: none;
+    }
+    #mask {
+      position: absolute;
+      background-color: rgba(0, 0, 0, 0.6);
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+    #result-banner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      font-size: 1.6em;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+      z-index: 3;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="header">
+    CROSTAFF<br>
+    <span id="area-name">エリア名取得中...</span><br>
+    <span id="status">カメラ起動中...</span>
+  </div>
+  <div id="reader">
+    <div id="mask"></div>
+    <div id="qrbox-frame"></div>
+  </div>
+  <div id="result-banner"></div>
+
+  <script>
+    const areaMap = {
+      "バックステージ": "OBS",
+      "小講堂": "OSA",
+      "男子更衣室": "MCR",
+      "女子更衣室": "WCR"
+    };
+
+    const params = new URLSearchParams(location.search);
+    const areaName = params.get("area") || "未設定";
+    const areaCode = areaMap[areaName] || "UNK";
+
+    document.getElementById("area-name").innerText = areaName;
+    const statusEl = document.getElementById("status");
+    const bannerEl = document.getElementById("result-banner");
+
+    const html5QrCode = new Html5Qrcode("reader");
+    let lastScan = "";
+    let lastTime = 0;
+
+    function setQrBoxSize(viewfinderWidth, viewfinderHeight) {
+      const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.6);
+      const left = (viewfinderWidth - size) / 2;
+      const top = (viewfinderHeight - size) / 2;
+      const box = document.getElementById("qrbox-frame");
+      box.style.width = `${size}px`;
+      box.style.height = `${size}px`;
+      box.style.left = `${left}px`;
+      box.style.top = `${top}px`;
+    }
+
+    function showBanner(text) {
+      bannerEl.innerText = text;
+      bannerEl.style.display = "block";
+      setTimeout(() => bannerEl.style.display = "none", 2000);
+    }
+
+    function sendLog(staffId) {
+      const now = Date.now();
+      if (staffId === lastScan && now - lastTime < 3000) return;
+      lastScan = staffId;
+      lastTime = now;
+
+      const endpoint = "https://script.google.com/macros/s/AKfycbx85vMW0Rh9zTRqnLfyr4zAjZ-WWVIIB-8CBC46elZfe_cJyCbewoQfRuf0n5nWj5r1/exec";
+      const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
+
+      statusEl.innerText = "送信中...";
+
+      fetch(url).then(res => res.text()).then(txt => {
+        let message = `${staffId}\n${areaName}\n`;
+        if (txt.includes("IN")) message += "入室処理完了";
+        else if (txt.includes("OUT")) message += "退室処理完了";
+        else message += `エラー: ${txt}`;
+        showBanner(message);
+        statusEl.innerText = "読み取り中";
+      }).catch(err => {
+        showBanner(`${staffId}\n${areaName}\n通信エラー`);
+        statusEl.innerText = "エラー発生";
+      });
+    }
+
+    Html5Qrcode.getCameras().then(cameras => {
+      if (cameras && cameras.length) {
+        const backCam = cameras.find(c => c.label.toLowerCase().includes("back")) || cameras[0];
+        html5QrCode.start(
+          backCam.id,
+          { fps: 10, qrbox: setQrBoxSize },
+          text => {
+            if (!text.startsWith("cs25=")) {
+              statusEl.innerText = "不正なコード";
+              return;
+            }
+            const staffId = text.split("=")[1];
+            sendLog(staffId);
+          },
+          () => { statusEl.innerText = "読み取り中"; }
+        );
+      } else {
+        statusEl.innerText = "カメラが見つかりません";
+      }
+    });
+  </script>
+</body>
+</html>
