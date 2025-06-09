@@ -184,33 +184,34 @@
     }
 
     function startCamera(cameraId) {
-      html5QrCode.start(
-        cameraId,
-        {
-          fps: 10,
-          qrbox: (w, h) => {
-            const size = 500;
-            return {
-              width: size,
-              height: size,
-              x: (w - size) / 2,
-              y: 300
-            };
-          },
-          aspectRatio: 1.0,
-          experimentalFeatures: { useBarCodeDetectorIfSupported: true }
-        },
-        decodedText => {
-          if (!decodedText.startsWith("cs25-")) {
-            updateStatus("無効なコード", "orange");
-            return;
-          }
-          const staffId = decodedText.slice(5);
-          sendLog(staffId);
-        },
-        () => updateStatus("スキャン中", "white")
-      ).catch(err => updateStatus("カメラ起動失敗: " + err, "red"));
-    }
+   html5QrCode.start(
+     cameraId,
+     {
+       fps: 10,
+       qrbox: (w, h) => {
+         const size = 500;
+         return {
+           width: size,
+           height: size,
+           x: (w - size) / 2,
+           y: 300
+         };
+       },
+       aspectRatio: 1.0,
+       experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+     },
+     decodedText => {
+       if (!decodedText.startsWith("cs25-")) {
+         updateStatus("無効なコード", "orange");
+         return;
+       }
+       const staffId = decodedText.slice(5);
+       sendLog(staffId);
+     },
+     () => updateStatus("スキャン中", "white")
+   ).catch(err => updateStatus("カメラ起動失敗: " + err, "red")); 
+ }
+
 
     Html5Qrcode.getCameras().then(devices => {
       if (devices.length === 0) {
