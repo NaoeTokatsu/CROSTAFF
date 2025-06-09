@@ -22,13 +22,20 @@
       align-items: center;
       padding: 10px 20px;
       font-weight: bold;
-      font-size: 2em;
+      font-size: 1.8em;
       background: #007b43;
+    }
+    #info {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 20px 10px;
+      font-size: 1.2em;
+      font-weight: bold;
     }
     #reader-container {
       position: relative;
       width: 100vw;
-      height: calc(100vh - 160px);
+      height: calc(100vh - 190px);
     }
     #reader {
       width: 100%;
@@ -37,9 +44,9 @@
     }
     #footer {
       position: fixed;
-      bottom: 0;
+      bottom: 15px;
       width: 100vw;
-      height: 100px;
+      height: 115px;
       background: #007b43;
       display: flex;
       flex-direction: column;
@@ -50,7 +57,6 @@
       font-size: 1.1em;
       padding: 10px 20px;
       border-radius: 10px;
-      margin-top: 10px;
       background: white;
       color: #007b43;
       font-weight: bold;
@@ -69,18 +75,6 @@
       display: none;
       z-index: 100;
     }
-    #processing-banner {
-      background: rgba(0, 0, 0, 0.85);
-      color: white;
-    }
-    #result-banner {
-      background: rgba(0, 0, 0, 0.85);
-      color: white;
-    }
-    #error-banner {
-      background: #e53935;
-      color: white;
-    }
   </style>
 </head>
 <body>
@@ -88,14 +82,16 @@
     <span>CROSTAFF</span>
     <span>v1.0</span>
   </div>
-
+  <div id="info">
+    <div id="area-name">エリア名取得中...</div>
+    <div id="status">準備中</div>
+  </div>
   <div id="reader-container">
     <div id="reader"></div>
-    <div id="processing-banner" class="banner">処理中...</div>
+    <div id="processing-banner" class="banner" style="background:#004d40; color:white;">処理中...</div>
     <div id="result-banner" class="banner"></div>
-    <div id="error-banner" class="banner"></div>
+    <div id="error-banner" class="banner" style="background:#e53935; color:white;"></div>
   </div>
-
   <div id="footer">
     <label for="camera-select">カメラ切替</label>
     <select id="camera-select"></select>
@@ -107,6 +103,8 @@
     const processingBanner = document.getElementById("processing-banner");
     const resultBanner = document.getElementById("result-banner");
     const errorBanner = document.getElementById("error-banner");
+    const areaNameEl = document.getElementById("area-name");
+    const statusEl = document.getElementById("status");
 
     const areaMap = {
       "バックステージ": "obs",
@@ -125,24 +123,31 @@
     const params = new URLSearchParams(location.search);
     const areaName = params.get("area") || "未設定";
     const areaCode = areaMap[areaName] || "unk";
-
     const endpoint = "https://script.google.com/macros/s/AKfycbx0v1nlONAziZzoQratUpF98n_I8l7sjkn2kWOZs3iJdz2doO9WFv7ILmKBKumO0S2SKw/exec";
+
+    areaNameEl.textContent = areaName;
 
     let currentCameraId = null;
     let scanning = false;
     let lastScan = "";
     let lastTime = 0;
 
-    function showBanner(element, message, duration = 3000) {
-      element.innerText = message;
-      element.style.display = "block";
+    function setStatus(msg) {
+      statusEl.textContent = msg;
+    }
+
+    function showBanner(el, message, bgColor = null, duration = 3000) {
+      el.innerText = message;
+      if (bgColor) el.style.backgroundColor = bgColor;
+      el.style.display = "block";
       setTimeout(() => {
-        element.style.display = "none";
+        el.style.display = "none";
       }, duration);
     }
 
     async function sendToGAS(staffId) {
-      showBanner(processingBanner, "処理中...");
+      showBanner(processingBanner, "処理中...", "#004d40");
+      setStatus("処理中");
       const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
       try {
         const res = await fetch(url);
@@ -150,32 +155,39 @@
         const [code, area, id] = text.trim().split(",");
         const areaFull = reverseAreaMap[area] || "未設定";
         let msg = "";
+        let bg = "";
         if (code === "1") {
           msg = `記録成功\n入室\n${id}\n${areaFull}`;
+          bg = "#34c759";
         } else if (code === "2") {
           msg = `記録成功\n退室\n${id}\n${areaFull}`;
+          bg = "#2196f3";
         } else {
           msg = `記録失敗\n${id}\n${areaFull}`;
+          bg = "#e53935";
         }
-        showBanner(resultBanner, msg, 3000);
+        showBanner(resultBanner, msg, bg, 3000);
+        setStatus("スキャン中");
       } catch (err) {
-        showBanner(errorBanner, "通信エラー\n記録できませんでした", 4000);
+        showBanner(errorBanner, "通信エラー\n記録できませんでした", "#e53935", 4000);
+        setStatus("通信エラー");
       }
     }
 
     async function startCamera(cameraId) {
-      if (scanning) {
-        await reader.stop().catch(() => {});
-        scanning = false;
-      }
       try {
+        if (scanning) {
+          await reader.stop();
+          scanning = false;
+        }
+        setStatus("カメラ準備中");
         await reader.start(
           cameraId,
           { fps: 10 },
           async decodedText => {
             const now = Date.now();
             if (!decodedText.startsWith("cs25-")) {
-              showBanner(errorBanner, "無効なQRコード");
+              showBanner(errorBanner, "無効なQRコード", "#e53935");
               return;
             }
             const staffId = decodedText.slice(5);
@@ -184,19 +196,21 @@
             lastTime = now;
             scanning = false;
             await sendToGAS(staffId);
-            await startCamera(cameraId);
+            await startCamera(cameraId); // 再起動
           },
-          () => {}
+          () => {} // スキャン失敗時は無視
         );
         scanning = true;
+        setStatus("スキャン中");
       } catch (err) {
-        showBanner(errorBanner, "カメラ起動失敗\n" + err.message);
+        showBanner(errorBanner, "カメラ起動失敗\n" + err.message, "#e53935");
+        setStatus("カメラ起動失敗");
       }
     }
 
     Html5Qrcode.getCameras().then(devices => {
       if (devices.length === 0) {
-        showBanner(errorBanner, "カメラが見つかりません");
+        showBanner(errorBanner, "カメラが見つかりません", "#e53935");
         return;
       }
       devices.forEach((device, i) => {
