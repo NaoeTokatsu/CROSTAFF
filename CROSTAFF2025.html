@@ -5,12 +5,14 @@
   <title>CROSTAFF2025 QR Scanner</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&display=swap');
+
     html, body {
       margin: 0;
       padding: 0;
       background: black;
       color: white;
-      font-family: 'Noto Sans', sans-serif;
+      font-family: 'Noto Sans JP', sans-serif;
       height: 100%;
       overflow: hidden;
     }
@@ -43,7 +45,7 @@
       position: absolute;
       width: 320px;
       height: 320px;
-      border: 3px dashed rgba(255,255,255,0.9);
+      border: 4px dashed rgba(255,255,255,0.9);
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
@@ -67,7 +69,8 @@
       transform: translate(-50%, -50%);
       background-color: transparent;
       color: white;
-      font-size: 2em;
+      font-size: 2.5em;
+      font-weight: 700;
       padding: 30px;
       text-align: center;
       z-index: 5;
@@ -85,7 +88,7 @@
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.5.0</div>
+    <div>v1.5.1</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜ 
@@ -154,10 +157,16 @@
       const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
       fetch(url).then(r => r.text()).then(result => {
         let msg = `${staffId}\n${areaName}\n`;
-        if (result === "1") msg += "入室処理完了";
-        else if (result === "2") msg += "退室処理完了";
-        else msg += `エラー: ${result}`;
-        showOverlay(msg, result === "1" ? "lime" : result === "2" ? "skyblue" : "red");
+        if (result === "1") {
+          msg += "入室処理完了";
+          showOverlay(msg, "lime");
+        } else if (result === "2") {
+          msg += "退室処理完了";
+          showOverlay(msg, "skyblue");
+        } else {
+          msg += `エラー: ${result}`;
+          showOverlay(msg, "red");
+        }
         setTimeout(() => {
           hideOverlay();
           updateStatus("waiting");
@@ -194,7 +203,7 @@
       readingPaused = true;
 
       updateStatus("scanned");
-      showOverlay("処理中", "yellow");
+      showOverlay("処理中", "orange");
       sendLog(staffId);
     }
 
