@@ -65,7 +65,7 @@
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.1.0</div>
+    <div>v1.2.0</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜ 
@@ -112,21 +112,21 @@
       }, 2000);
     }
 
-    function sendLog(group, staffId) {
+    function sendLog(staffId) {
       const now = Date.now();
-      if (group + staffId === lastScan && now - lastTime < 3000) return;
-      lastScan = group + staffId;
+      if (staffId === lastScan && now - lastTime < 3000) return;
+      lastScan = staffId;
       lastTime = now;
 
-      const url = `${endpoint}?staff=${staffId}&group=${group}&area=${areaCode}`;
+      const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
       fetch(url).then(r => r.text()).then(result => {
-        let msg = `${group}${staffId}\n${areaName}\n`;
+        let msg = `${staffId}\n${areaName}\n`;
         if (result === "IN") msg += "入室処理完了";
         else if (result === "OUT") msg += "退室処理完了";
         else msg += `エラー: ${result}`;
         showBanner(msg);
       }).catch(() => {
-        showBanner(`${group}${staffId}\n${areaName}\n通信エラー`);
+        showBanner(`${staffId}\n${areaName}\n通信エラー`);
         statusEl.innerText = "通信エラー";
       });
     }
@@ -136,20 +136,19 @@
         statusEl.innerText = "無効なコード";
         return;
       }
-      const match = decodedText.match(/^cs25-([a-z]{3})(\d{4})$/);
+      const match = decodedText.match(/^cs25-([a-z]{3}\d{4})$/);
       if (!match) {
         statusEl.innerText = "フォーマットエラー";
         return;
       }
-      const group = match[1];
-      const staffId = match[2];
+      const staffId = match[1];
 
       statusEl.innerText = "読み取り済み";
-      sendLog(group, staffId);
+      sendLog(staffId);
     }
 
     function startCamera(cameraId) {
-      if (cameraRunning) return; // 再起動防止
+      if (cameraRunning) return;
 
       html5QrCode.start(
         cameraId,
