@@ -51,27 +51,27 @@
     <div id="result-banner"></div>
   </div>
   <script>
-    // 3レター←→正式名称
-    const areaMap = {
-      "バックステージ": "obs",
-      "小講堂": "osa",
-      "男子更衣室": "mcr",
-      "女子更衣室": "wcr"
-    };
-    const reverseAreaMap = {
+    // 3レター→正式名称
+    const areaNames = {
       "obs": "バックステージ",
       "osa": "小講堂",
       "mcr": "男子更衣室",
       "wcr": "女子更衣室",
       "unk": "未設定"
     };
+    const areaMap = {
+      "バックステージ": "obs",
+      "小講堂": "osa",
+      "男子更衣室": "mcr",
+      "女子更衣室": "wcr"
+    };
 
     // URLパラメータからエリア名
     const params = new URLSearchParams(location.search);
     const areaName = params.get("area") || "未設定";
     const areaCode = areaMap[areaName] || "unk";
-    // ← デプロイID反映済み
-    const endpoint = "https://script.google.com/macros/s/AKfycbx85vMW0Rh9zTRqnLfyr4zAjZ-WWVIIB-8CBC46elZfe_cJyCbewoQfRuf0n5nWj5r1/exec";
+    // デプロイID反映済み
+    const endpoint = "https://script.google.com/macros/s/AKfycbx4S3Xcdx4I9gb9EM-pnYA1pwuMWJQARqZqPdnOODvj7Igr0iiJeGU-Gsa0-K_1IDDW/exec";
 
     const areaEl = document.getElementById("area-name");
     const statusEl = document.getElementById("status");
@@ -110,9 +110,9 @@
       fetch(url)
         .then(r => r.text())
         .then(result => {
-          // 返却例: "1,obs,12345"  "0,unk,12345"
+          // 返却例: "1,obs,TESTID"
           const [status, area3, staff] = result.trim().split(",");
-          let areaFullName = reverseAreaMap[area3] || "未設定";
+          let areaFullName = areaNames[area3] || "未設定";
           let message, bannerColor;
           if (status === "1") {
             message = `記録成功\n${staff} ${areaFullName} 入室`;
