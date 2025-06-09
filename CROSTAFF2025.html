@@ -156,31 +156,31 @@
       updateStatus("処理中", "yellow");
 
       const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
-      fetch(url).then(r => r.text()).then(result => {
-        const readableArea = reverseAreaMap[areaCode] || areaCode;
-        let line1 = "";
-        let line2 = "";
+      fetch(url)
+        .then(r => r.text())
+        .then(result => {
+          const readableArea = reverseAreaMap[areaCode] || areaCode;
+          let actionLabel = "";
+          let bannerColor = "";
 
-        if (result === "1") {
-          line1 = "記録成功";
-          line2 = `${staffId} ${readableArea} 入室`;
-          showBanner(`${line1}\n${line2}`, "limegreen", () => updateStatus("スキャン中", "white"));
-        } else if (result === "2") {
-          line1 = "記録成功";
-          line2 = `${staffId} ${readableArea} 退室`;
-          showBanner(`${line1}\n${line2}`, "skyblue", () => updateStatus("スキャン中", "white"));
-        } else if (["OK", "SUCCESS", "記録成功"].includes(result)) {
-          line1 = "記録成功";
-          line2 = `${staffId} ${readableArea}`;
-          showBanner(`${line1}\n${line2}`, "limegreen", () => updateStatus("スキャン中", "white"));
-        } else {
-          line1 = "記録失敗";
-          line2 = result;
-          showBanner(`${line1}\n${line2}`, "red", () => updateStatus("記録失敗", "red"));
-        }
-      }).catch(() => {
-        showBanner("記録失敗\n通信エラー", "red", () => updateStatus("通信エラー", "red"));
-      });
+          if (result === "1") {
+            actionLabel = "入室";
+            bannerColor = "limegreen";
+          } else if (result === "2") {
+            actionLabel = "退室";
+            bannerColor = "skyblue";
+          }
+
+          if (actionLabel) {
+            const message = `記録成功\n${staffId} ${readableArea} ${actionLabel}`;
+            showBanner(message, bannerColor, () => updateStatus("スキャン中", "white"));
+          } else {
+            showBanner(`記録失敗\n${result}`, "red", () => updateStatus("記録失敗", "red"));
+          }
+        })
+        .catch(() => {
+          showBanner("記録失敗\n通信エラー", "red", () => updateStatus("通信エラー", "red"));
+        });
     }
 
     function startCamera(cameraId) {
