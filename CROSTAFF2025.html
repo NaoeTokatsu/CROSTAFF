@@ -43,7 +43,6 @@
     #reader {
       width: 100%;
       height: 100%;
-      object-fit: cover;
       position: relative;
     }
     #result-banner {
@@ -106,6 +105,7 @@
       "男子更衣室": "mcr",
       "女子更衣室": "wcr"
     };
+
     const params = new URLSearchParams(location.search);
     const areaName = params.get("area") || "未設定";
     const areaCode = areaMap[areaName] || "unk";
@@ -148,37 +148,41 @@
 
       const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
       fetch(url).then(r => r.text()).then(result => {
-        let msg = `${staffId}\n${areaName}\n`;
-        if (result === "1") {
-          msg += "入室処理完了";
+        let action = "";
+        if (result === "1") action = "入室";
+        else if (result === "2") action = "退室";
+
+        if (action) {
+          const msg = `処理成功：${staffId}：${areaName}：${action}`;
           showBanner(msg, "limegreen", () => updateStatus("スキャン中", "white"));
-        } else if (result === "2") {
-          msg += "退室処理完了";
-          showBanner(msg, "skyblue", () => updateStatus("スキャン中", "white"));
         } else if (result === "OK" || result === "SUCCESS") {
-          msg += "記録成功";
+          const msg = `処理成功：${staffId}：${areaName}：記録成功`;
           showBanner(msg, "limegreen", () => updateStatus("スキャン中", "white"));
         } else {
-          msg += `エラー: ${result}`;
+          const msg = `処理失敗：${result}`;
           showBanner(msg, "red", () => updateStatus("処理失敗", "red"));
         }
       }).catch(() => {
-        showBanner(`${staffId}\n${areaName}\n通信エラー`, "red", () => updateStatus("通信エラー", "red"));
+        const msg = `処理失敗：通信エラー`;
+        showBanner(msg, "red", () => updateStatus("通信エラー", "red"));
       });
     }
 
     function startCamera(cameraId) {
-      const boxSize = Math.floor(Math.min(window.innerWidth, window.innerHeight) * 0.6);
-
       html5QrCode.start(
         cameraId,
-        { fps: 10, qrbox: { width: boxSize, height: boxSize } },
+        {
+          fps: 10,
+          qrbox: { width: 300, height: 300 },
+          aspectRatio: 1.0,
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        },
         decodedText => {
           if (!decodedText.startsWith("cs25-")) {
             updateStatus("無効なコード", "orange");
             return;
           }
-          const staffId = decodedText.slice(5); // 「cs25-aaa1234」→「aaa1234」
+          const staffId = decodedText.slice(5);
           sendLog(staffId);
         },
         () => updateStatus("スキャン中", "white")
