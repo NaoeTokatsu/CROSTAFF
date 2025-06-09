@@ -36,6 +36,7 @@
     #reader {
       width: 100%;
       height: 100%;
+      object-fit: cover;
     }
     #qrbox-frame {
       position: absolute;
@@ -79,23 +80,16 @@
       z-index: 5;
       display: none;
     }
-    #camera-select {
-      margin: 10px 20px;
-      font-size: 1em;
-      padding: 5px;
-    }
   </style>
 </head>
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.3.1</div>
+    <div>v1.3.2</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜
     <span id="status">カメラ初期化中...</span>
-    <br>
-    <select id="camera-select"></select>
   </div>
   <div id="reader-container">
     <div id="reader"></div>
@@ -118,7 +112,6 @@
 
     const areaEl = document.getElementById("area-name");
     const statusEl = document.getElementById("status");
-    const cameraSelect = document.getElementById("camera-select");
     const bannerEl = document.getElementById("result-banner");
 
     areaEl.textContent = areaName;
@@ -153,18 +146,10 @@
       });
     }
 
-    function startCamera(cameraId) {
-      if (html5QrCode) {
-        html5QrCode.stop().then(() => runScanner(cameraId));
-      } else {
-        runScanner(cameraId);
-      }
-    }
-
-    function runScanner(cameraId) {
+    function runScanner() {
       html5QrCode = new Html5Qrcode("reader");
       html5QrCode.start(
-        { deviceId: { exact: cameraId } },
+        { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         decodedText => {
           if (!decodedText.startsWith("cs25=")) {
@@ -178,28 +163,12 @@
           statusEl.innerText = "読み取り中";
         }
       ).catch(err => {
-        statusEl.innerText = "カメラ起動失敗";
+        statusEl.innerText = "カメラ起動失敗: " + err;
       });
     }
 
-    Html5Qrcode.getCameras().then(cameras => {
-      if (!cameras.length) {
-        statusEl.innerText = "カメラが見つかりません";
-        return;
-      }
-      cameras.forEach(cam => {
-        const opt = document.createElement("option");
-        opt.value = cam.id;
-        opt.text = cam.label || `カメラ${cameraSelect.length + 1}`;
-        cameraSelect.appendChild(opt);
-      });
-      const defaultCamera = cameras.find(c => c.label.toLowerCase().includes("back")) || cameras[0];
-      cameraSelect.value = defaultCamera.id;
-      startCamera(defaultCamera.id);
-      cameraSelect.onchange = () => startCamera(cameraSelect.value);
-    }).catch(() => {
-      statusEl.innerText = "カメラ取得失敗";
-    });
+    // 初期起動
+    runScanner();
   </script>
 </body>
 </html>
