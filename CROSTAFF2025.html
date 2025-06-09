@@ -26,13 +26,10 @@
     #info {
       background: black;
       padding: 0 30px 15px;
-      font-size: 2.2em;
+      font-size: 1.5em;
       font-weight: bold;
-    }
-    #status {
-      font-size: 1.8em;
-      display: inline-block;
-      min-width: 150px;
+      display: flex;
+      justify-content: space-between;
     }
     #reader-container {
       position: relative;
@@ -47,9 +44,9 @@
     }
     #result-banner {
       position: absolute;
-      bottom: 5%;
+      top: 50%;
       left: 50%;
-      transform: translate(-50%, 0);
+      transform: translate(-50%, -50%);
       background-color: rgba(0, 0, 0, 0.85);
       color: white;
       font-size: 2em;
@@ -65,20 +62,20 @@
       bottom: 20px;
       right: 20px;
       z-index: 6;
-      font-size: 1.5em;
+      font-size: 2em;
       background-color: black;
       color: white;
-      border: 1px solid white;
-      padding: 8px;
-      border-radius: 8px;
+      border: 2px solid white;
+      padding: 10px;
+      border-radius: 10px;
     }
     #camera-label {
       position: absolute;
-      bottom: 60px;
+      bottom: 70px;
       right: 20px;
       z-index: 6;
       color: white;
-      font-size: 1.2em;
+      font-size: 1.5em;
     }
   </style>
 </head>
@@ -88,7 +85,7 @@
     <div>v1.0.0</div>
   </div>
   <div id="info">
-    <span id="area-name">エリア名取得中...</span> ｜ 
+    <span id="area-name">エリア名取得中...</span>
     <span id="status">カメラ初期化中...</span>
   </div>
   <label id="camera-label" for="camera-select">カメラ切替:</label>
@@ -164,19 +161,17 @@
     }
 
     function startCamera(cameraId) {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const boxSize = Math.floor(Math.min(vw, vh) * 0.6);
+      const boxSize = Math.floor(Math.min(window.innerWidth, window.innerHeight) * 0.6);
 
       html5QrCode.start(
         cameraId,
         { fps: 10, qrbox: { width: boxSize, height: boxSize } },
         decodedText => {
-          if (!decodedText.startsWith("cs25")) {
+          if (!decodedText.startsWith("cs25-")) {
             updateStatus("無効なコード", "orange");
             return;
           }
-          const staffId = decodedText.split("=")[1];
+          const staffId = decodedText.slice(5); // 例: "cs25-aaa1234" → "aaa1234"
           sendLog(staffId);
         },
         () => updateStatus("スキャン中", "white")
