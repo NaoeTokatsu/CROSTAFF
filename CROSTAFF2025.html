@@ -5,14 +5,12 @@
   <title>CROSTAFF2025 QR Scanner</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&display=swap');
-
     html, body {
       margin: 0;
       padding: 0;
       background: black;
       color: white;
-      font-family: 'Noto Sans JP', sans-serif;
+      font-family: 'Noto Sans', sans-serif;
       height: 100%;
       overflow: hidden;
     }
@@ -21,19 +19,19 @@
       justify-content: space-between;
       align-items: center;
       background: black;
-      padding: 10px 20px;
+      padding: 15px 30px;
       font-weight: 900;
-      font-size: 3em;
+      font-size: 2.25em;
     }
     #info {
       background: black;
-      padding: 0 20px 10px;
-      font-size: 2.25em;
+      padding: 0 30px 15px;
+      font-size: 1.5em;
     }
     #reader-container {
       position: relative;
       width: 100vw;
-      height: calc(100vh - 160px);
+      height: calc(100vh - 180px);
     }
     #reader {
       width: 100%;
@@ -43,36 +41,40 @@
     }
     #qrbox-frame {
       position: absolute;
-      border: 4px dashed rgba(255,255,255,0.9);
+      width: 300px;
+      height: 300px;
+      border: 3px dashed rgba(255,255,255,0.9);
+      top: calc(50% - 150px);
+      left: calc(50% - 150px);
       z-index: 3;
       pointer-events: none;
     }
     #result-banner {
       position: absolute;
-      top: 35%;
+      top: 40%;
       left: 50%;
       transform: translate(-50%, -50%);
-      font-size: 2.5em;
-      font-weight: 700;
-      padding: 30px;
+      color: white;
+      font-size: 2em;
+      padding: 20px 30px;
+      border-radius: 12px;
       text-align: center;
       z-index: 5;
       display: none;
-      border-radius: 12px;
     }
     #camera-select {
-      position: absolute;
-      top: 120px;
+      position: fixed;
+      top: 180px;
       left: 20px;
       z-index: 6;
-      font-size: 2.25em;
+      font-size: 1.5em;
     }
   </style>
 </head>
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.6.0</div>
+    <div>v1.0.0</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜ 
@@ -86,8 +88,6 @@
   </div>
 
   <script>
-    const qrboxSize = Math.floor(Math.min(window.innerWidth, window.innerHeight) * 0.5);
-
     const areaMap = {
       "バックステージ": "obs",
       "小講堂": "osa",
@@ -107,94 +107,78 @@
 
     areaEl.textContent = areaName;
 
-    qrboxFrame.style.width = qrboxSize + "px";
-    qrboxFrame.style.height = qrboxSize + "px";
-    qrboxFrame.style.top = `calc(50% - ${qrboxSize / 2}px)`;
-    qrboxFrame.style.left = `calc(50% - ${qrboxSize / 2}px)`;
-
     let html5QrCode = new Html5Qrcode("reader");
     let currentCameraId = null;
     let lastScan = "";
     let lastTime = 0;
-    let readingPaused = false;
 
-    function showBanner(message, color) {
-      bannerEl.innerText = message;
-      bannerEl.style.backgroundColor = color;
-      bannerEl.style.display = "block";
-    }
+    const qrboxSize = 300;
 
-    function hideBanner() {
-      bannerEl.style.display = "none";
-    }
-
-    function updateStatus(text, color = "white") {
+    function updateStatus(text, color) {
       statusEl.innerText = text;
       statusEl.style.color = color;
     }
 
-    function sendLog(staffId) {
-      updateStatus("処理中", "orange");
-      fetch(`${endpoint}?staff=${staffId}&area=${areaCode}`)
-        .then(res => res.text())
-        .then(result => {
-          let msg = `${staffId}\n${areaName}\n`;
-          let color = "gray";
-          if (result === "1") {
-            msg += "入室処理完了";
-            color = "lime";
-            updateStatus("入室完了", color);
-          } else if (result === "2") {
-            msg += "退室処理完了";
-            color = "skyblue";
-            updateStatus("退室完了", color);
-          } else {
-            msg += `エラー: ${result}`;
-            color = "red";
-            updateStatus("通信エラー", color);
-          }
-          showBanner(msg, color);
-          setTimeout(() => {
-            hideBanner();
-            updateStatus("スキャン中");
-            readingPaused = false;
-          }, 2000);
-        })
-        .catch(() => {
-          updateStatus("通信エラー", "red");
-          showBanner(`${staffId}\n${areaName}\n通信エラー`, "red");
-          setTimeout(() => {
-            hideBanner();
-            updateStatus("スキャン中");
-            readingPaused = false;
-          }, 2000);
-        });
+    function showBanner(message, bgColor) {
+      bannerEl.innerText = message;
+      bannerEl.style.backgroundColor = bgColor;
+      bannerEl.style.display = "block";
+      setTimeout(() => {
+        bannerEl.style.display = "none";
+      }, 2000);
     }
 
-    function decodeQR(decodedText) {
-      if (readingPaused) return;
-      if (!decodedText.startsWith("cs25-")) return;
-
-      const match = decodedText.match(/^cs25-([a-z]{3}\d{4})$/);
-      if (!match) return;
-
+    function sendLog(staffId) {
       const now = Date.now();
-      const staffId = match[1];
       if (staffId === lastScan && now - lastTime < 3000) return;
       lastScan = staffId;
       lastTime = now;
-      readingPaused = true;
 
-      sendLog(staffId);
+      updateStatus("処理中", "orange");
+
+      const url = `${endpoint}?staff=${staffId}&area=${areaCode}`;
+      fetch(url)
+        .then(r => r.text())
+        .then(result => {
+          let msg = `${staffId}\n${areaName}\n`;
+          if (result === "1") {
+            msg += "入室処理完了";
+            showBanner(msg, "limegreen");
+            updateStatus("スキャン中", "white");
+          } else if (result === "2") {
+            msg += "退室処理完了";
+            showBanner(msg, "skyblue");
+            updateStatus("スキャン中", "white");
+          } else {
+            msg += `エラー: ${result}`;
+            showBanner(msg, "red");
+            updateStatus("通信エラー", "red");
+          }
+        })
+        .catch(() => {
+          showBanner(`${staffId}\n${areaName}\n通信エラー`, "red");
+          updateStatus("通信エラー", "red");
+        });
     }
 
     function startCamera(cameraId) {
       html5QrCode.start(
         cameraId,
         { fps: 10, qrbox: { width: qrboxSize, height: qrboxSize } },
-        decodeQR,
-        () => updateStatus("スキャン中")
-      ).catch(err => updateStatus("カメラ起動失敗", "red"));
+        decodedText => {
+          if (!decodedText.startsWith("cs25-")) {
+            updateStatus("無効なコード", "red");
+            return;
+          }
+          const staffId = decodedText.split("-")[1];
+          sendLog(staffId);
+        },
+        () => {
+          updateStatus("スキャン中", "white");
+        }
+      ).catch(err => {
+        updateStatus("カメラ起動失敗: " + err, "red");
+      });
     }
 
     Html5Qrcode.getCameras().then(devices => {
@@ -216,10 +200,11 @@
       startCamera(currentCameraId);
 
       cameraSelect.addEventListener("change", e => {
-        html5QrCode.stop().then(() => {
-          startCamera(e.target.value);
-        });
+        const newCameraId = e.target.value;
+        html5QrCode.stop().then(() => startCamera(newCameraId));
       });
+    }).catch(err => {
+      updateStatus(`カメラ取得失敗: ${err}`, "red");
     });
   </script>
 </body>
