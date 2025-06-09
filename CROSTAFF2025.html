@@ -47,7 +47,7 @@
       top: 20%;
       left: 50%;
       transform: translate(-50%, 0);
-      z-index: 2;
+      z-index: 3;
       pointer-events: none;
     }
     #mask {
@@ -55,16 +55,9 @@
       width: 100%;
       height: 100%;
       background-color: rgba(0,0,0,0.6);
-      clip-path: polygon(
-        0% 0%, 100% 0%, 100% 100%, 0% 100%,
-        0% 0%,
-        calc(50% - 30vw) 20%,
-        calc(50% + 30vw) 20%,
-        calc(50% + 30vw) calc(20% + 60vw),
-        calc(50% - 30vw) calc(20% + 60vw),
-        calc(50% - 30vw) 20%
-      );
-      z-index: 1;
+      mask: radial-gradient(circle at center, transparent 30vw, rgba(0,0,0,0.6) 30.1vw);
+      -webkit-mask: radial-gradient(circle at center, transparent 30vw, rgba(0,0,0,0.6) 30.1vw);
+      z-index: 2;
       pointer-events: none;
     }
     #result-banner {
@@ -93,7 +86,7 @@
 <body>
   <div id="header">
     <div>CROSTAFF</div>
-    <div>v1.0.2</div>
+    <div>v1.0.4</div>
   </div>
   <div id="info">
     <span id="area-name">エリア名取得中...</span> ｜ 
@@ -109,14 +102,14 @@
 
   <script>
     const areaMap = {
-      "バックステージ": "OBS",
-      "小講堂": "OSA",
-      "男子更衣室": "MCR",
-      "女子更衣室": "WCR"
+      "バックステージ": "obs",
+      "小講堂": "osa",
+      "男子更衣室": "mcr",
+      "女子更衣室": "wcr"
     };
     const params = new URLSearchParams(location.search);
     const areaName = params.get("area") || "未設定";
-    const areaCode = areaMap[areaName] || "UNK";
+    const areaCode = areaMap[areaName] || "unk";
     const endpoint = "https://script.google.com/macros/s/AKfycbx85vMW0Rh9zTRqnLfyr4zAjZ-WWVIIB-8CBC46elZfe_cJyCbewoQfRuf0n5nWj5r1/exec";
 
     const areaEl = document.getElementById("area-name");
@@ -163,11 +156,16 @@
         cameraId,
         { fps: 10, qrbox: { width: 0.6 * window.innerWidth, height: 0.6 * window.innerWidth } },
         decodedText => {
-          if (!decodedText.startsWith("cs25=")) {
+          if (!decodedText.startsWith("cs25-")) {
             statusEl.innerText = "無効なコード";
             return;
           }
-          const staffId = decodedText.split("=")[1];
+          const parts = decodedText.split("-");
+          if (parts.length !== 3) {
+            statusEl.innerText = "形式エラー";
+            return;
+          }
+          const staffId = parts[2]; // 4桁ID部分のみ送信
           sendLog(staffId);
         },
         () => {
