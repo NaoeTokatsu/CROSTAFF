@@ -50,11 +50,10 @@
       position: relative;
       z-index: 1;
     }
-    /* ---- QRスキャン範囲の枠は完全に削除！ ---- */
-    #result-banner, #processing-banner {
+    #result-banner, #processing-banner, #error-banner {
       position: fixed;
       left: 50%;
-      transform: translate(-50%, -42%); /* ←中央より少し上へ */
+      transform: translate(-50%, -42%);
       min-width: 240px;
       white-space: pre-line;
       letter-spacing: 0.03em;
@@ -83,6 +82,18 @@
       line-height: 1.5;
       border-radius: 18px;
       padding: 28px 18px;
+      display: none;
+    }
+    #error-banner {
+      top: 38%;
+      background: #e53935;
+      color: #fff;
+      font-size: 1.8em;
+      font-weight: bold;
+      padding: 28px 20px;
+      border-radius: 18px;
+      text-align: center;
+      z-index: 200;
       display: none;
     }
     #footer {
@@ -149,6 +160,7 @@
     <div id="reader"></div>
     <div id="result-banner"></div>
     <div id="processing-banner">処理中...</div>
+    <div id="error-banner"></div>
   </div>
   <div id="footer">
     <div id="camera-label">カメラ切替</div>
@@ -179,16 +191,18 @@
     const areaEl = document.getElementById("area-name");
     const statusEl = document.getElementById("status");
     const bannerEl = document.getElementById("result-banner");
+    const errorBanner = document.getElementById("error-banner");
     const cameraSelect = document.getElementById("camera-select");
     const processingBanner = document.getElementById("processing-banner");
 
     areaEl.textContent = areaName;
 
-    let html5QrCode = new Html5Qrcode("reader");
+    let html5QrCode = null;
     let currentCameraId = null;
     let scanning = false;
     let lastScan = "";
     let lastTime = 0;
+    let retryTimeout = null;
 
     function updateStatus(message) {
       statusEl.textContent = message;
@@ -203,9 +217,15 @@
         if (callback) callback();
       }, duration);
     }
+    function showErrorBanner(message, duration = 5000) {
+      errorBanner.innerText = message;
+      errorBanner.style.display = "block";
+      setTimeout(() => {
+        errorBanner.style.display = "none";
+      }, duration);
+    }
 
     function sendLog(staffId) {
-      // --- 処理中バナーを表示 ---
       processingBanner.style.display = "block";
       updateStatus("処理中");
       scanning = false;
@@ -214,7 +234,6 @@
       fetch(url)
         .then(r => r.text())
         .then(result => {
-          // --- バナーを隠す ---
           processingBanner.style.display = "none";
           let [code, area, id] = result.trim().split(",");
           let areaFull = reverseAreaMap[area] || "未設定";
@@ -245,24 +264,25 @@
         })
         .catch(() => {
           processingBanner.style.display = "none";
-          showBanner("記録失敗\n通信エラー", "#e53935", 3000, () => {
-            updateStatus("スキャン中");
-            scanning = true;
-          });
+          showErrorBanner("記録失敗\n通信エラー", 5000);
+          updateStatus("通信エラー");
+          scanning = true;
         });
     }
 
     function startCamera(cameraId) {
+      if(html5QrCode) {
+        html5QrCode.clear();
+      }
+      html5QrCode = new Html5Qrcode("reader");
       scanning = true;
       updateStatus("スキャン中");
+
       html5QrCode.start(
         cameraId,
         {
           fps: 10,
-          qrbox: function(w, h) {
-            // QRボックス描画なし。実質何も返さず
-            return false;
-          },
+          qrbox: () => false, // 枠なし
           aspectRatio: 1.0,
           experimentalFeatures: { useBarCodeDetectorIfSupported: true }
         },
@@ -270,41 +290,80 @@
           if (!scanning) return;
           if (!decodedText.startsWith("cs25-")) {
             updateStatus("無効なコード");
+            showErrorBanner("無効なQRコードです");
             return;
           }
           const staffId = decodedText.slice(5);
           const now = Date.now();
-          if (staffId === lastScan && now - lastTime < 2500) return; // 2.5秒ダブルスキャンガード
+          if (staffId === lastScan && now - lastTime < 2500) return;
           lastScan = staffId;
           lastTime = now;
           scanning = false;
           sendLog(staffId);
         },
         () => updateStatus("スキャン中")
-      ).catch(err => updateStatus("カメラ起動失敗: " + err));
+      ).catch(err => {
+        updateStatus("カメラ起動失敗: " + err);
+        showErrorBanner("カメラ起動失敗\n" + err, 6000);
+        scanning = false;
+      });
     }
 
-    Html5Qrcode.getCameras().then(devices => {
-      if (devices.length === 0) {
-        updateStatus("カメラが見つかりません");
-        return;
+    function tryStartCamera(cameras, preferredType) {
+      // Try preferredType ("back" or "front")
+      let selected = cameras.find(d => d.label && d.label.toLowerCase().includes(preferredType));
+      if (!selected) selected = cameras[0];
+      if(selected){
+        currentCameraId = selected.id;
+        cameraSelect.value = selected.id;
+        startCamera(selected.id);
+      } else {
+        showErrorBanner("利用可能なカメラが見つかりません", 6000);
+        updateStatus("カメラなし");
+        scanning = false;
       }
-      devices.forEach((device, idx) => {
-        const option = document.createElement("option");
-        option.value = device.id;
-        option.text = device.label || `カメラ ${idx+1}`;
-        cameraSelect.appendChild(option);
-      });
-      const defaultCamera = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
-      currentCameraId = defaultCamera.id;
-      cameraSelect.value = currentCameraId;
-      startCamera(currentCameraId);
+    }
 
-      cameraSelect.addEventListener("change", e => {
-        const newCameraId = e.target.value;
-        html5QrCode.stop().then(() => startCamera(newCameraId));
+    function listAndInitCameras() {
+      Html5Qrcode.getCameras().then(devices => {
+        cameraSelect.innerHTML = "";
+        if (devices.length === 0) {
+          updateStatus("カメラが見つかりません");
+          showErrorBanner("カメラが見つかりません", 8000);
+          return;
+        }
+        devices.forEach((device, idx) => {
+          const option = document.createElement("option");
+          option.value = device.id;
+          option.text = device.label || `カメラ ${idx+1}`;
+          cameraSelect.appendChild(option);
+        });
+        // Try back camera first if available, otherwise first one
+        tryStartCamera(devices, "back");
+      }).catch(err => {
+        updateStatus("カメラ取得失敗: " + err);
+        showErrorBanner("カメラ取得失敗\n" + err, 7000);
       });
-    }).catch(err => updateStatus("カメラ取得失敗: " + err));
+    }
+
+    cameraSelect.addEventListener("change", e => {
+      const newCameraId = e.target.value;
+      updateStatus("カメラ切替中...");
+      scanning = false;
+      if (html5QrCode) {
+        html5QrCode.stop()
+          .then(() => startCamera(newCameraId))
+          .catch(err => {
+            updateStatus("カメラ切替失敗: " + err);
+            showErrorBanner("カメラ切替失敗\n" + err, 6000);
+          });
+      } else {
+        startCamera(newCameraId);
+      }
+    });
+
+    // 初期化
+    window.onload = listAndInitCameras;
   </script>
 </body>
 </html>
