@@ -29,6 +29,11 @@
       font-size: 2.2em;
       font-weight: bold;
     }
+    #status {
+      font-size: 1.8em;
+      display: inline-block;
+      min-width: 150px;
+    }
     #reader-container {
       position: relative;
       width: 100vw;
@@ -42,9 +47,9 @@
     }
     #result-banner {
       position: absolute;
-      top: 30%;
+      bottom: 5%;
       left: 50%;
-      transform: translate(-50%, -50%);
+      transform: translate(-50%, 0);
       background-color: rgba(0, 0, 0, 0.85);
       color: white;
       font-size: 2em;
@@ -57,10 +62,23 @@
     }
     #camera-select {
       position: absolute;
-      top: 120px;
-      left: 20px;
+      bottom: 20px;
+      right: 20px;
       z-index: 6;
       font-size: 1.5em;
+      background-color: black;
+      color: white;
+      border: 1px solid white;
+      padding: 8px;
+      border-radius: 8px;
+    }
+    #camera-label {
+      position: absolute;
+      bottom: 60px;
+      right: 20px;
+      z-index: 6;
+      color: white;
+      font-size: 1.2em;
     }
   </style>
 </head>
@@ -73,6 +91,7 @@
     <span id="area-name">エリア名取得中...</span> ｜ 
     <span id="status">カメラ初期化中...</span>
   </div>
+  <label id="camera-label" for="camera-select">カメラ切替:</label>
   <select id="camera-select"></select>
   <div id="reader-container">
     <div id="reader"></div>
@@ -108,11 +127,14 @@
       statusEl.style.color = color;
     }
 
-    function showBanner(message, color) {
+    function showBanner(message, color, callback) {
       bannerEl.innerText = message;
       bannerEl.style.display = "block";
       bannerEl.style.backgroundColor = color;
-      setTimeout(() => bannerEl.style.display = "none", 2000);
+      setTimeout(() => {
+        bannerEl.style.display = "none";
+        if (callback) callback();
+      }, 2000);
     }
 
     function sendLog(staffId) {
@@ -128,28 +150,27 @@
         let msg = `${staffId}\n${areaName}\n`;
         if (result === "1") {
           msg += "入室処理完了";
-          showBanner(msg, "limegreen");
-          updateStatus("スキャン中", "white");
+          showBanner(msg, "limegreen", () => updateStatus("スキャン中", "white"));
         } else if (result === "2") {
           msg += "退室処理完了";
-          showBanner(msg, "skyblue");
-          updateStatus("スキャン中", "white");
+          showBanner(msg, "skyblue", () => updateStatus("スキャン中", "white"));
         } else {
           msg += `エラー: ${result}`;
-          showBanner(msg, "red");
-          updateStatus("処理失敗", "red");
+          showBanner(msg, "red", () => updateStatus("処理失敗", "red"));
         }
       }).catch(() => {
-        showBanner(`${staffId}\n${areaName}\n通信エラー`, "red");
-        updateStatus("通信エラー", "red");
+        showBanner(`${staffId}\n${areaName}\n通信エラー`, "red", () => updateStatus("通信エラー", "red"));
       });
     }
 
     function startCamera(cameraId) {
-      const qrboxSize = 300;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const boxSize = Math.floor(Math.min(vw, vh) * 0.6);
+
       html5QrCode.start(
         cameraId,
-        { fps: 10, qrbox: { width: qrboxSize, height: qrboxSize } },
+        { fps: 10, qrbox: { width: boxSize, height: boxSize } },
         decodedText => {
           if (!decodedText.startsWith("cs25")) {
             updateStatus("無効なコード", "orange");
