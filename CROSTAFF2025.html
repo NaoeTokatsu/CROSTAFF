@@ -50,57 +50,46 @@
       position: relative;
       z-index: 1;
     }
-    /* QRスキャン範囲を画面中央より少し上に正方形で配置 */
-    .qr-custom-overlay {
-      position: absolute;
-      left: 50%;
-      top: 32%;
-      transform: translate(-50%, -50%);
-      border: 4px solid #fff;
-      border-radius: 18px;
-      width: min(60vw, 360px);
-      height: min(60vw, 360px);
-      box-shadow: 0 0 16px 4px rgba(0,0,0,0.25);
-      z-index: 4;
-      pointer-events: none;
-    }
-    #result-banner {
+    /* ---- QRスキャン範囲の枠は完全に削除！ ---- */
+    #result-banner, #processing-banner {
       position: fixed;
-      top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0,0,0,0.85);
-      color: white;
-      font-size: 2.4em;
-      font-weight: bold;
-      padding: 36px 32px;
-      border-radius: 18px;
-      text-align: center;
-      z-index: 20;
-      display: none;
+      transform: translate(-50%, -42%); /* ←中央より少し上へ */
       min-width: 240px;
       white-space: pre-line;
       letter-spacing: 0.03em;
       box-shadow: 0 0 18px 6px rgba(0,0,0,0.4);
     }
-    #processing-banner {
+    #result-banner {
+      top: 42%;
+      background: rgba(0,0,0,0.85);
+      color: white;
+      font-size: 2.2em;
+      font-weight: bold;
+      padding: 32px 28px;
+      border-radius: 18px;
+      text-align: center;
+      z-index: 20;
       display: none;
-      position: fixed;
-      left: 0; right: 0; top: 0; bottom: 0;
+    }
+    #processing-banner {
+      top: 40%;
       background: rgba(0,0,0,0.78);
       color: #fff;
-      font-size: 2.3em;
+      font-size: 2em;
       font-weight: 900;
       z-index: 99;
       text-align: center;
-      line-height: 100vh;
-      letter-spacing: 0.08em;
+      line-height: 1.5;
+      border-radius: 18px;
+      padding: 28px 18px;
+      display: none;
     }
     #footer {
       position: fixed;
       bottom: 0;
       width: 100vw;
-      height: 70px;
+      height: 95px;
       background: #007b43;
       display: flex;
       flex-direction: column;
@@ -108,26 +97,29 @@
       justify-content: flex-start;
       z-index: 12;
       box-shadow: 0 -4px 14px -7px rgba(0,0,0,0.24);
+      padding-top: 9px;
+      padding-bottom: 18px;
     }
     #camera-label {
       color: white;
-      font-size: 1.1em;
+      font-size: 1.15em;
       font-weight: bold;
-      margin-bottom: 4px;
-      margin-top: 6px;
+      margin-bottom: 3px;
+      margin-top: 5px;
       letter-spacing: 0.04em;
     }
     #camera-select {
       font-size: 1.25em;
-      padding: 8px 18px;
+      padding: 11px 22px;
       border-radius: 11px;
       background: #fff;
       color: #007b43;
       border: none;
       font-weight: bold;
-      margin-bottom: 10px;
+      margin-bottom: 7px;
       margin-top: 0;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      min-width: 180px;
     }
     @media (min-width: 600px) {
       #reader {
@@ -135,10 +127,6 @@
         margin: 0 auto;
         left: 0; right: 0;
         top: 0; bottom: 0;
-      }
-      .qr-custom-overlay {
-        width: 360px;
-        height: 360px;
       }
       #footer {
         width: 600px;
@@ -159,7 +147,6 @@
   </div>
   <div id="reader-container">
     <div id="reader"></div>
-    <div class="qr-custom-overlay"></div>
     <div id="result-banner"></div>
     <div id="processing-banner">処理中...</div>
   </div>
@@ -273,14 +260,8 @@
         {
           fps: 10,
           qrbox: function(w, h) {
-            // 中央より少し上に正方形
-            const boxSize = Math.min(w, h, 360);
-            return {
-              width: boxSize,
-              height: boxSize,
-              x: (w - boxSize) / 2,
-              y: Math.max((h * 0.32) - (boxSize / 2), 0)
-            };
+            // QRボックス描画なし。実質何も返さず
+            return false;
           },
           aspectRatio: 1.0,
           experimentalFeatures: { useBarCodeDetectorIfSupported: true }
